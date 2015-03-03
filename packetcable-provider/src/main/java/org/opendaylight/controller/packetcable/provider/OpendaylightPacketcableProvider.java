@@ -3,6 +3,8 @@ package org.opendaylight.controller.packetcable.provider;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -144,6 +146,10 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
 		DataObject dataObject = change.getUpdatedSubtree();
+		Map<InstanceIdentifier<?>, DataObject> created = change.getCreatedData();
+		Map<InstanceIdentifier<?>, DataObject> updated = change.getUpdatedData();
+		Map<InstanceIdentifier<?>, DataObject> original = change.getOriginalData();
+		Set<InstanceIdentifier<?>> removed = change.getRemovedPaths();
 		logger.debug("OpendaylightPacketcableProvider.onDataChanged() :" + dataObject);
 	}
 

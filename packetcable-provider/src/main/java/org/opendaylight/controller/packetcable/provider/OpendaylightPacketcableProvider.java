@@ -147,9 +147,37 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
 		DataObject dataObject = change.getUpdatedSubtree();
 		Map<InstanceIdentifier<?>, DataObject> created = change.getCreatedData();
+		String createdStr = created.toString();
+//		{InstanceIdentifier{
+//			targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
+//			path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+//					org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+//				key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+//			org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
+//			org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
+//		}=CmtsNode{
+//			getAddress=IpAddress [_ipv4Address=Ipv4Address [_value=192.168.1.2], _value=[1, 9, 2, ., 1, 6, 8, ., 1, ., 2]],
+//			getPort=PortNumber [_value=3918],
+//			augmentations={}
+//		}}
+		Set<InstanceIdentifier<?>> createdKeys = created.keySet();
+//		[InstanceIdentifier{
+//			targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
+//			path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+//			org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+//				key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
+//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
+//		}]
+		DataObject cmtsNode = created.get("CmtsNode");
+
+
 		Map<InstanceIdentifier<?>, DataObject> updated = change.getUpdatedData();
+		String updatedStr = updated.toString();
 		Map<InstanceIdentifier<?>, DataObject> original = change.getOriginalData();
+		String originalStr = original.toString();
 		Set<InstanceIdentifier<?>> removed = change.getRemovedPaths();
+		String removedStr = removed.toString();
 		logger.debug("OpendaylightPacketcableProvider.onDataChanged() :" + dataObject);
 	}
 

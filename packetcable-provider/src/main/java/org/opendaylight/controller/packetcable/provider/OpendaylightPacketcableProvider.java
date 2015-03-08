@@ -1,5 +1,6 @@
 package org.opendaylight.controller.packetcable.provider;
 
+import java.lang.reflect.Array;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -25,6 +26,10 @@ import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderCo
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.RoutedRpcRegistration;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.Action;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowInput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowOutput;
@@ -47,9 +52,11 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.M
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.ApplyActionsCase;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.list.Instruction;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeContextRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAdded;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAddedBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemoved;
@@ -66,6 +73,8 @@ import org.opendaylight.yangtools.concepts.CompositeObjectRegistration.Composite
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.yang.binding.DataObject;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
+import org.opendaylight.yangtools.yang.binding.InstanceIdentifier.PathArgument;
+import org.opendaylight.yangtools.yang.binding.KeyedInstanceIdentifier;
 import org.opendaylight.yangtools.yang.binding.RpcService;
 import org.opendaylight.yangtools.yang.common.RpcResult;
 import org.opendaylight.yangtools.yang.common.RpcResultBuilder;
@@ -76,6 +85,7 @@ import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.CheckedFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -99,11 +109,13 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	private DataBroker dataBroker;
 	private ListenerRegistration<DataChangeListener> listenerRegistration;
 	private List<InstanceIdentifier<?>> cmtsInstances;
+	private Map<String, InstanceIdentifier<?>> cmtsInstanceMap;
 	private PCMMDataProcessor pcmmDataProcessor;
 
 	public OpendaylightPacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
 		cmtsInstances = Lists.newArrayList();
+		cmtsInstanceMap = Maps.newConcurrentMap();
 		pcmmDataProcessor = new PCMMDataProcessor();
 	}
 
@@ -143,42 +155,106 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	/**
 	 * Implemented from the DataChangeListener interface.
 	 */
+	private enum ChangeAction {created, updated, removed};
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
-		DataObject dataObject = change.getUpdatedSubtree();
-		Map<InstanceIdentifier<?>, DataObject> created = change.getCreatedData();
-		String createdStr = created.toString();
-//		{InstanceIdentifier{
-//			targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
-//			path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
-//					org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
-//				key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
-//			org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
-//			org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
-//		}=CmtsNode{
-//			getAddress=IpAddress [_ipv4Address=Ipv4Address [_value=192.168.1.2], _value=[1, 9, 2, ., 1, 6, 8, ., 1, ., 2]],
-//			getPort=PortNumber [_value=3918],
-//			augmentations={}
-//		}}
-		Set<InstanceIdentifier<?>> createdKeys = created.keySet();
-//		[InstanceIdentifier{
-//			targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
-//			path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
-//			org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
-//				key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
-//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
-//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
-//		}]
-		DataObject cmtsNode = created.get("CmtsNode");
+		ChangeAction changeAction = null;
+		Map<InstanceIdentifier<?>, DataObject> changedData = null;
+		Map<InstanceIdentifier<?>, DataObject> originalData = null;
+		Set<InstanceIdentifier<?>> removedData = null;
+		//	{InstanceIdentifier{
+		//		targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
+		//		path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+		//				org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+		//			key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+		//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
+		//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
+		//	}=CmtsNode{
+		//		getAddress=IpAddress [_ipv4Address=Ipv4Address [_value=192.168.1.2], _value=[1, 9, 2, ., 1, 6, 8, ., 1, ., 2]],
+		//		getPort=PortNumber [_value=3918],
+		//		augmentations={}
+		//	}}
 
+		// Determine what change action took place by looking at the change object's InstanceIdentifier sets
+		changedData = change.getCreatedData();
+		if (! changedData.isEmpty()) {
+			changeAction = ChangeAction.created;
+			originalData = changedData;
+		} else {
+			changedData = change.getUpdatedData();
+			if (! changedData.isEmpty()) {
+				changeAction = ChangeAction.updated;
+				originalData = change.getOriginalData();
+			} else {
+				removedData = change.getRemovedPaths();
+				if (! removedData.isEmpty()) {
+					changeAction = ChangeAction.removed;
+					originalData = change.getOriginalData();
+					changedData = originalData;
+				} else {
+					// we should not be here -- complain bitterly and return
+					logger.debug("onDataChanged(): Unknown change action: " + change);
+					return;
+				}
+			}
+		}
 
-		Map<InstanceIdentifier<?>, DataObject> updated = change.getUpdatedData();
-		String updatedStr = updated.toString();
-		Map<InstanceIdentifier<?>, DataObject> original = change.getOriginalData();
-		String originalStr = original.toString();
-		Set<InstanceIdentifier<?>> removed = change.getRemovedPaths();
-		String removedStr = removed.toString();
-		logger.debug("OpendaylightPacketcableProvider.onDataChanged() :" + dataObject);
+		// get the CMTS identity from the InstanceIdentifier Map key
+		InstanceIdentifier<?> nodesInstance = originalData.keySet().iterator().next();
+		InstanceIdentifier<Node> cmtsNodeInstance = nodesInstance.firstIdentifierOf(Node.class);
+		String cmtsId = InstanceIdentifier.keyOf(cmtsNodeInstance).getId().getValue();
+
+		// get the CMTS parameters from the CmtsNode in the Map entry
+		CmtsNode cmtsNode = null;
+        IpAddress address = null;
+        Ipv4Address ipv4Address = null;
+        String ipv4AddressStr = null;
+        PortNumber port = null;
+        Integer portNum = null;
+
+		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : changedData.entrySet()) {
+			if (entry.getValue() instanceof CmtsNode) {
+	            cmtsNode = (CmtsNode)entry.getValue();
+	            address = cmtsNode.getAddress();
+	            ipv4Address = address.getIpv4Address();
+	            ipv4AddressStr = ipv4Address.getValue();
+	            port = cmtsNode.getPort();
+	            portNum = port.getValue();
+	        }
+	    }
+
+		// select the change action
+		InstanceIdentifier<?> thisCmtsInstance = null;
+		switch (changeAction) {
+		case created:
+			cmtsInstanceMap.put(cmtsId, nodesInstance);
+			//TODO: call consumer to add CMTS
+			logger.info("onDataChanged(): created " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			break;
+		case updated:
+			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
+//			if (thisCmtsInstance.equals(nodesInstance)) {
+//				logger.error("onDataChanged(): updated " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " vs " + nodesInstance);
+//				return;
+//			}
+			//TODO: call consumer to update CMTS
+			logger.info("onDataChanged(): updated " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			break;
+		case removed:
+			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
+//			if (thisCmtsInstance.equals(nodesInstance)) {
+//				logger.error("onDataChanged(): removed " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " vs " + nodesInstance);
+//				return;
+//			}
+			cmtsInstanceMap.remove(cmtsId);
+			//TODO: call consumer to remove CMTS
+			logger.info("onDataChanged(): removed " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			break;
+		default:
+			// we should not be here -- complain bitterly and return
+			logger.debug("onDataChanged(): Unknown switch change action: " + change);
+			return;
+		}
 	}
 
 	public void notifyConsumerOnCmtsAdd(CmtsNode input, TransactionId transactionId) {

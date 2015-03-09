@@ -90,6 +90,12 @@ import com.google.common.util.concurrent.CheckedFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 
+import org.pcmm.rcd.IPCMMPolicyServer;
+import org.pcmm.rcd.IPCMMPolicyServer.IPSCMTSClient;
+import org.pcmm.rcd.impl.PCMMPolicyServer;
+
+
+
 @SuppressWarnings("unused")
 public class OpendaylightPacketcableProvider implements DataChangeListener,
 		SalFlowService, OpenDaylightPacketCableProviderService,
@@ -111,12 +117,14 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	private List<InstanceIdentifier<?>> cmtsInstances;
 	private Map<String, InstanceIdentifier<?>> cmtsInstanceMap;
 	private PCMMDataProcessor pcmmDataProcessor;
+	private PcmmService pcmmService;
 
 	public OpendaylightPacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
 		cmtsInstances = Lists.newArrayList();
 		cmtsInstanceMap = Maps.newConcurrentMap();
 		pcmmDataProcessor = new PCMMDataProcessor();
+		pcmmService = new PcmmService();
 	}
 
 	public void setNotificationProvider(final NotificationProviderService salService) {
@@ -152,10 +160,90 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		}
 	}
 
+	/*
+	 * PCMM services -- locally implemented from packetcable-consumer.PcmmServiceImpl.java
+	 * sync call only, no notification required
+	 */
+
+	private class PcmmService {
+		private Map<IpAddress, IPSCMTSClient> cmtsClients;
+		private IPCMMPolicyServer policyServer;
+
+		public PcmmService() {
+			policyServer = new PCMMPolicyServer();
+			cmtsClients = Maps.newConcurrentMap();
+		}
+
+		public void addCmts(CmtsNode cmtsNode) {
+			String ipv4 = cmtsNode.getAddress().getIpv4Address().getValue();
+			logger.info("addCmts(): " + ipv4);
+			IPSCMTSClient client = policyServer.requestCMTSConnection(ipv4);
+			if (client.isConnected()) {
+				cmtsClients.put(cmtsNode.getAddress(), client);
+				logger.info("addCmts(): connected:" + ipv4);
+			}
+		}
+
+		public void removeCmts(CmtsNode cmtsNode) {
+			String ipv4 = cmtsNode.getAddress().getIpv4Address().getValue();
+			logger.info("removeCmts(): " + ipv4);
+			if (cmtsClients.containsKey(cmtsNode.getAddress())) {
+				IPSCMTSClient client = cmtsClients.remove(cmtsNode.getAddress());
+				client.disconnect();
+				logger.info("removeCmts(): disconnected: " + ipv4);
+			}
+		}
+
+		public Boolean sendGateSet() {
+			// TODO change me
+			boolean ret = true;
+			for (Iterator<IPSCMTSClient> iter = cmtsClients.values().iterator(); iter.hasNext();)
+				ret &= cmtsClients.get(0).gateSet();
+			return ret;
+		}
+
+		public Boolean sendGateDelete() {
+			// TODO change me
+			boolean ret = true;
+			for (Iterator<IPSCMTSClient> iter = cmtsClients.values().iterator(); iter.hasNext();)
+				ret &= cmtsClients.get(0).gateDelete();
+			return ret;
+		}
+
+		public Boolean sendGateSynchronize() {
+			// TODO change me
+			boolean ret = true;
+			for (Iterator<IPSCMTSClient> iter = cmtsClients.values().iterator(); iter.hasNext();)
+				ret &= cmtsClients.get(0).gateSynchronize();
+			return ret;
+		}
+
+		public Boolean sendGateInfo() {
+			// TODO change me
+			boolean ret = true;
+			for (Iterator<IPSCMTSClient> iter = cmtsClients.values().iterator(); iter.hasNext();)
+				ret &= cmtsClients.get(0).gateInfo();
+			return ret;
+		}
+
+	}
+
+
 	/**
 	 * Implemented from the DataChangeListener interface.
 	 */
+	private CmtsNode getCmtsNode(Map<InstanceIdentifier<?>, DataObject> thisData) {
+		CmtsNode cmtsNode = null;
+		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
+			if (entry.getValue() instanceof CmtsNode) {
+	            cmtsNode = (CmtsNode)entry.getValue();
+	        }
+	    }
+		return cmtsNode;
+	}
+
 	private enum ChangeAction {created, updated, removed};
+
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
 		ChangeAction changeAction = null;
@@ -193,7 +281,7 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 					changedData = originalData;
 				} else {
 					// we should not be here -- complain bitterly and return
-					logger.debug("onDataChanged(): Unknown change action: " + change);
+					logger.error("onDataChanged(): Unknown change action: " + change);
 					return;
 				}
 			}
@@ -205,71 +293,66 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		String cmtsId = InstanceIdentifier.keyOf(cmtsNodeInstance).getId().getValue();
 
 		// get the CMTS parameters from the CmtsNode in the Map entry
-		CmtsNode cmtsNode = null;
-        IpAddress address = null;
-        Ipv4Address ipv4Address = null;
-        String ipv4AddressStr = null;
-        PortNumber port = null;
-        Integer portNum = null;
-
-		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : changedData.entrySet()) {
-			if (entry.getValue() instanceof CmtsNode) {
-	            cmtsNode = (CmtsNode)entry.getValue();
-	            address = cmtsNode.getAddress();
-	            ipv4Address = address.getIpv4Address();
-	            ipv4AddressStr = ipv4Address.getValue();
-	            port = cmtsNode.getPort();
-	            portNum = port.getValue();
-	        }
-	    }
+		CmtsNode cmtsNode = getCmtsNode(changedData);
+        IpAddress address = cmtsNode.getAddress();
+        Ipv4Address ipv4Address = address.getIpv4Address();
+        String ipv4AddressStr = ipv4Address.getValue();
+        PortNumber port = cmtsNode.getPort();
+        Integer portNum = port.getValue();
 
 		// select the change action
 		InstanceIdentifier<?> thisCmtsInstance = null;
+		TransactionId transactionId = TransactionId.getDefaultInstance("1234");
 		switch (changeAction) {
 		case created:
-			cmtsInstanceMap.put(cmtsId, nodesInstance);
-			//TODO: call consumer to add CMTS
 			logger.info("onDataChanged(): created " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			cmtsInstanceMap.put(cmtsId, nodesInstance);
+			pcmmService.addCmts(cmtsNode);
 			break;
 		case updated:
-			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
-//			if (thisCmtsInstance.equals(nodesInstance)) {
-//				logger.error("onDataChanged(): updated " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " vs " + nodesInstance);
-//				return;
-//			}
-			//TODO: call consumer to update CMTS
 			logger.info("onDataChanged(): updated " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
+			if (! thisCmtsInstance.equals(nodesInstance)) {
+				logger.error("onDataChanged(): updated " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " ***VS*** " + nodesInstance);
+				return;
+			}
+			cmtsInstanceMap.put(cmtsId, nodesInstance);
+			// remove original cmtsNode
+			pcmmService.removeCmts(getCmtsNode(originalData));
+			// and add back the new one
+			pcmmService.addCmts(cmtsNode);
 			break;
 		case removed:
-			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
-//			if (thisCmtsInstance.equals(nodesInstance)) {
-//				logger.error("onDataChanged(): removed " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " vs " + nodesInstance);
-//				return;
-//			}
-			cmtsInstanceMap.remove(cmtsId);
-			//TODO: call consumer to remove CMTS
 			logger.info("onDataChanged(): removed " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
+			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
+			if (! thisCmtsInstance.equals(nodesInstance)) {
+				logger.error("onDataChanged(): removed " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " ***VS*** " + nodesInstance);
+				return;
+			}
+			cmtsInstanceMap.remove(cmtsId);
+			pcmmService.removeCmts(cmtsNode);
 			break;
 		default:
 			// we should not be here -- complain bitterly and return
-			logger.debug("onDataChanged(): Unknown switch change action: " + change);
+			logger.error("onDataChanged(): Unknown switch change action: " + change);
 			return;
 		}
 	}
 
 	public void notifyConsumerOnCmtsAdd(CmtsNode input, TransactionId transactionId) {
-		CmtsAdded cmtsRemoved = new CmtsAddedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-		notificationProvider.publish(cmtsRemoved);
+		CmtsAdded cmtsAdded = new CmtsAddedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
+		notificationService.publish(cmtsAdded);
 	}
 
 	public void notifyConsumerOnCmtsRemove(CmtsNode input, TransactionId transactionId) {
 		CmtsRemoved cmtsRemoved = new CmtsRemovedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-		notificationProvider.publish(cmtsRemoved);
+		notificationService.publish(cmtsRemoved);
 	}
 
 	public void notifyConsumerOnCmtsUpdate(CmtsNode input, TransactionId transactionId) {
-		CmtsUpdated cmtsRemoved = new CmtsUpdatedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-		notificationProvider.publish(cmtsRemoved);
+		// Obsolete method: do not use
+//		CmtsUpdated cmtsUpdated = new CmtsUpdatedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
+//		notificationService.publish(cmtsUpdated);
 	}
 
 	@Override

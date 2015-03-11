@@ -23,7 +23,7 @@ module packetcable-traffic-profile
         description "Initial revision of packetcable traffic profile";
     }        
 
-
+/* #####
     typedef tp-reference {
     type instance-identifier;
     }
@@ -781,6 +781,7 @@ Attribute Masks define a specific set of attributes associated with a DOCSIS 3.0
         case "real-time-polling-service-case" { container real-time-polling-service {uses traffic-profile-real-time-polling-service-attributes; } }
         case "downstream-service-case" { container downstream-service {uses traffic-profile-downstream-service-attributes; }}
     }
+
     augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:instructions/fni:instruction/fni:instruction/fni:write-actions-case/fni:write-actions/fni:action/fni:action" {
         case "flowspec-case" { container flowspec {uses traffic-profile-flowspec-attributes; } }
         case "docsis-service-class-name-case" { container docsis-service-class-name {uses traffic-profile-docsis-service-class-name-attributes; } }
@@ -805,6 +806,7 @@ Attribute Masks define a specific set of attributes associated with a DOCSIS 3.0
         case "real-time-polling-service-case" { container real-time-polling-service {uses traffic-profile-real-time-polling-service-attributes; } }
         case "downstream-service-case" { container downstream-service {uses traffic-profile-downstream-service-attributes; }}
     }
+
     augment "/inv:nodes/inv:node/fni:group/fni:buckets/fni:bucket/fni:action/fni:action" {
         case "flowspec-case" { container flowspec {uses traffic-profile-flowspec-attributes; } }
         case "docsis-service-class-name-case" { container docsis-service-class-name {uses traffic-profile-docsis-service-class-name-attributes; } }
@@ -866,4 +868,6 @@ Attribute Masks define a specific set of attributes associated with a DOCSIS 3.0
 //        grouping real-time-polling-service { uses traffic-profile-real-time-polling-service; }
 //        grouping downstream-service { uses traffic-profile-downstream-service; }
 //    }
+
+##### */
 }

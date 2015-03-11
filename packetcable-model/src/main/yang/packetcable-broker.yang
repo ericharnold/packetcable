@@ -13,22 +13,32 @@ module packetcable-broker {
     revision 2014-09-09 {
         description "Initial revision of packetcable broker";
     }
+    
+
 
     notification cmts-added {
         uses tr:transaction-metadata;
-        uses cmts:cmts-node-attributes;
+//       uses cmts:cmts-node-attributes;
+//       uses cmts:pcmm-apps;
+//       uses cmts:pcmm-flow-attributes;
         uses tr:transaction-aware;
     }
-
+    
     notification cmts-updated {
         uses tr:transaction-metadata;
-        uses cmts:cmts-node-attributes;
+//       uses cmts:cmts-node-attributes;
+//       uses cmts:pcmm-apps;
+//       uses cmts:pcmm-flow-attributes;
+        uses tr:transaction-aware;
+    }
+    
+    notification cmts-removed {
+        uses tr:transaction-metadata;
+//        uses cmts:cmts-node-attributes;
+//        uses cmts:pcmm-apps;
+//        uses cmts:pcmm-flow-attributes;
         uses tr:transaction-aware;
     }
 
-    notification cmts-removed {
-        uses tr:transaction-metadata;
-        uses cmts:cmts-node-attributes;
-        uses tr:transaction-aware;
-    }
+      
 }

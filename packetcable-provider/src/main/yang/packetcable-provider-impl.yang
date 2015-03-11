@@ -31,6 +31,17 @@ module packetcable-provider-impl {
     augment "/config:modules/config:module/config:configuration" {
         case packetcable-provider-impl {
             when "/config:modules/config:module/config:type = 'packetcable-provider-impl'";
+
+		      //wires in the data-broker service
+		      container data-broker {
+		        uses config:service-ref {
+		          refine type {
+		              mandatory true;
+		              config:required-identity mdsal:binding-async-data-broker;
+		          }
+		        }
+		      }
+
             container broker {
                 uses config:service-ref {
                     refine type {

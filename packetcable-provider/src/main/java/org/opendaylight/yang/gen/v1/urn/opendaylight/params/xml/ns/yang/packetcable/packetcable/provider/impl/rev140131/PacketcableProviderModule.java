@@ -1,11 +1,16 @@
 package org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.packetcable.packetcable.provider.impl.rev140131;
 
+import org.opendaylight.controller.md.sal.binding.api.DataBroker;
+import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
+import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.packetcable.provider.OpendaylightPacketcableProvider;
+import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.packetcable.packetcable.provider.impl.rev140131.AbstractPacketcableProviderModule {
     private static final Logger logger = LoggerFactory.getLogger(PacketcableProviderModule.class);
+
     public PacketcableProviderModule(org.opendaylight.controller.config.api.ModuleIdentifier identifier, org.opendaylight.controller.config.api.DependencyResolver dependencyResolver) {
         super(identifier, dependencyResolver);
     }
@@ -23,6 +28,15 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
     public java.lang.AutoCloseable createInstance() {
         OpendaylightPacketcableProvider provider = new OpendaylightPacketcableProvider();
         this.getBrokerDependency().registerProvider(provider, null);
+
+        DataBroker dataBrokerService = getDataBrokerDependency();
+        provider.setDataProvider(dataBrokerService);
+
+        final ListenerRegistration<DataChangeListener> cmtsNodeDataChangeListenerRegistration =
+                dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
+                        provider.nodeIID, provider, DataBroker.DataChangeScope.SUBTREE );
+
+
         logger.info("PacketCableProvider Registered with Broker");
         return provider;
     }

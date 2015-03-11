@@ -41,12 +41,12 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.Upda
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.UpdateFlowOutput;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.flow.update.OriginalFlow;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.flow.update.UpdatedFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileBestEffortAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileDocsisServiceClassNameAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileFlowspecAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.BestEffortCase;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.DocsisServiceClassNameCase;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.FlowspecCase;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileBestEffortAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileDocsisServiceClassNameAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileFlowspecAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.BestEffortCase;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.DocsisServiceClassNameCase;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.add.flow.input.instructions.instruction.instruction.apply.actions._case.apply.actions.action.action.FlowspecCase;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.transaction.rev131103.TransactionId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.Match;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.ApplyActionsCase;
@@ -57,17 +57,17 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAdded;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAddedBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemoved;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemovedBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdated;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdatedBuilder;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAdded;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAddedBuilder;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemoved;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemovedBuilder;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdated;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdatedBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcRemoveFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowOriginal;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowUpdated;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcRemoveFlow;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowOriginal;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowUpdated;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration.CompositeObjectRegistrationBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
@@ -98,8 +98,10 @@ import org.pcmm.rcd.impl.PCMMPolicyServer;
 
 @SuppressWarnings("unused")
 public class OpendaylightPacketcableProvider implements DataChangeListener,
-		SalFlowService, OpenDaylightPacketCableProviderService,
-		BindingAwareProvider, AutoCloseable {
+		//SalFlowService,
+		OpenDaylightPacketCableProviderService,
+		BindingAwareProvider,
+		AutoCloseable {
 
 	private static final Logger logger = LoggerFactory.getLogger(OpendaylightPacketcableProvider.class);
 	private NotificationProviderService notificationProvider;
@@ -118,6 +120,9 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	private Map<String, InstanceIdentifier<?>> cmtsInstanceMap;
 	private PCMMDataProcessor pcmmDataProcessor;
 	private PcmmService pcmmService;
+
+	public static final InstanceIdentifier<Node>  nodeIID =
+            InstanceIdentifier.builder(Nodes.class).child(Node.class).build();
 
 	public OpendaylightPacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
@@ -339,6 +344,32 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		}
 	}
 
+	@Override
+	public Collection<? extends RpcService> getImplementations() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Collection<? extends ProviderFunctionality> getFunctionality() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public void onSessionInitiated(ProviderContext session) {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void onSessionInitialized(ConsumerContext session) {
+		// TODO Auto-generated method stub
+
+	}
+
+
+/* #####
 	public void notifyConsumerOnCmtsAdd(CmtsNode input, TransactionId transactionId) {
 		CmtsAdded cmtsAdded = new CmtsAddedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
 		notificationService.publish(cmtsAdded);
@@ -469,21 +500,21 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		// Noop
 
 	}
+*/
 
-	public void onSessionAdded(/* Whatever you need per CmtsConnection */) {
-		CompositeObjectRegistrationBuilder<OpendaylightPacketcableProvider> builder = CompositeObjectRegistration.<OpendaylightPacketcableProvider> builderFor(this);
-		/*
-		 * You will need a routedRpc registration per Cmts... I'm not doing the
-		 * accounting of storing them here, but you will need to so you can
-		 * close them when your provider is closed
-		 */
-		RoutedRpcRegistration<SalFlowService> registration = providerContext.addRoutedRpcImplementation(SalFlowService.class, this);
-		/*
-		 * You will need to get your identifier somewhere... this is your
-		 * nodeId. I would recommend adoption a convention like
-		 * "cmts:<ipaddress>" for CmtsCapableNodes
-		 * registration.registerPath(NodeContext.class, getIdentifier());
-		 */
-	}
-
+//	public void onSessionAdded(/* Whatever you need per CmtsConnection */) {
+//		CompositeObjectRegistrationBuilder<OpendaylightPacketcableProvider> builder = CompositeObjectRegistration.<OpendaylightPacketcableProvider> builderFor(this);
+//		/*
+//		 * You will need a routedRpc registration per Cmts... I'm not doing the
+//		 * accounting of storing them here, but you will need to so you can
+//		 * close them when your provider is closed
+//		 */
+//		RoutedRpcRegistration<SalFlowService> registration = providerContext.addRoutedRpcImplementation(SalFlowService.class, this);
+//		/*
+//		 * You will need to get your identifier somewhere... this is your
+//		 * nodeId. I would recommend adoption a convention like
+//		 * "cmts:<ipaddress>" for CmtsCapableNodes
+//		 * registration.registerPath(NodeContext.class, getIdentifier());
+//		 */
+//	}
 }

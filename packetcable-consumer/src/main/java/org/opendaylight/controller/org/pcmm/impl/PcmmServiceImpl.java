@@ -29,19 +29,19 @@ public class PcmmServiceImpl implements PcmmService {
 
 	@Override
 	public void onCmtsAdded(CmtsAdded notification) {
-		String ipv4 = notification.getAddress().getIpv4Address().getValue();
-		IPSCMTSClient client = policyServer.requestCMTSConnection(ipv4);
-		if (client.isConnected()) {
-			cmtsClients.put(notification.getAddress(), client);
-		}
+//		String ipv4 = notification.getAddress().getIpv4Address().getValue();
+//		IPSCMTSClient client = policyServer.requestCMTSConnection(ipv4);
+//		if (client.isConnected()) {
+//			cmtsClients.put(notification.getAddress(), client);
+//		}
 	}
 
 	@Override
 	public void onCmtsRemoved(CmtsRemoved notification) {
-		if (cmtsClients.containsKey(notification.getAddress())) {
-			IPSCMTSClient client = cmtsClients.remove(notification.getAddress());
-			client.disconnect();
-		}
+//		if (cmtsClients.containsKey(notification.getAddress())) {
+//			IPSCMTSClient client = cmtsClients.remove(notification.getAddress());
+//			client.disconnect();
+//		}
 	}
 
 	@Override

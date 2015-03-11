@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package org.opendaylight.controller.packetcable.provider.processors;
 
@@ -9,20 +9,20 @@ import java.net.UnknownHostException;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileBestEffortAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileDocsisServiceClassNameAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileFlowspecAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeAuthorizedEnvelope;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeCommittedEnvelope;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeReservedEnvelope;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.Match;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.SubscriberIdRpcAddFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesRpcAddFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesAttributes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcAddFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.tcp.match.ranges.attributes.TcpMatchRanges;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.udp.match.ranges.attributes.UpdMatchRanges;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileBestEffortAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileDocsisServiceClassNameAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileFlowspecAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeAuthorizedEnvelope;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeCommittedEnvelope;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeReservedEnvelope;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.Match;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.SubscriberIdRpcAddFlow;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesRpcAddFlow;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesAttributes;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcAddFlow;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.tcp.match.ranges.attributes.TcpMatchRanges;
+//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.udp.match.ranges.attributes.UdpMatchRanges;
 import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.ITrafficProfile;
@@ -34,14 +34,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * 
+ *
  * PacketCable data processor
- * 
+ *
  */
 public class PCMMDataProcessor {
 
 	private Logger logger = LoggerFactory.getLogger(PCMMDataProcessor.class);
-
+/*
 	public ITrafficProfile process(TrafficProfileBestEffortAttributes bestEffort) {
 		BestEffortService trafficProfile = new BestEffortService(BestEffortService.DEFAULT_ENVELOP);
 		getBEAuthorizedEnvelop(bestEffort, trafficProfile);
@@ -50,7 +50,7 @@ public class PCMMDataProcessor {
 		return trafficProfile;
 	}
 
-	
+
 	public ITrafficProfile process(TrafficProfileDocsisServiceClassNameAttributes docsis) {
 		DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
 		trafficProfile.setServiceClassName(docsis.getServiceClassName());
@@ -166,22 +166,22 @@ public class PCMMDataProcessor {
 		classifier.setSourcePortEnd(srcPortEnd);
 	}
 
-	private void getUdpMatchRangeValues(UdpMatchRangesAttributes updRange, IExtendedClassifier classifier) {
+	private void getUdpMatchRangeValues(UdpMatchRangesAttributes udpRange, IExtendedClassifier classifier) {
 		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
 		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
-		if (updRange != null) {
+		if (udpRange != null) {
 			classifier.setProtocol(IClassifier.Protocol.UDP);
-			UpdMatchRanges updMatchRanges = updRange.getUpdMatchRanges();
-			PortNumber udpDestinationPortStart = updMatchRanges.getUdpDestinationPortStart();
+			UdpMatchRanges udpMatchRanges = udpRange.getUdpMatchRanges();
+			PortNumber udpDestinationPortStart = udpMatchRanges.getUdpDestinationPortStart();
 			if (udpDestinationPortStart != null && udpDestinationPortStart.getValue() != null)
 				dstPortStart = udpDestinationPortStart.getValue().shortValue();
-			PortNumber udpSourcePortStart = updMatchRanges.getUdpSourcePortStart();
+			PortNumber udpSourcePortStart = udpMatchRanges.getUdpSourcePortStart();
 			if (udpSourcePortStart != null && udpSourcePortStart.getValue() != null)
 				srcPortStart = udpSourcePortStart.getValue().shortValue();
-			PortNumber udpDestinationPortEnd = updMatchRanges.getUdpDestinationPortEnd();
+			PortNumber udpDestinationPortEnd = udpMatchRanges.getUdpDestinationPortEnd();
 			if (udpDestinationPortEnd != null && udpDestinationPortEnd.getValue() != null)
 				dstPortEnd = udpDestinationPortEnd.getValue().shortValue();
-			PortNumber udpSourcePortEnd = updMatchRanges.getUdpSourcePortEnd();
+			PortNumber udpSourcePortEnd = udpMatchRanges.getUdpSourcePortEnd();
 			if (udpSourcePortEnd != null && udpSourcePortEnd.getValue() != null)
 				srcPortEnd = udpSourcePortEnd.getValue().shortValue();
 		}
@@ -190,5 +190,5 @@ public class PCMMDataProcessor {
 		classifier.setDestinationPortEnd(dstPortEnd);
 		classifier.setSourcePortEnd(srcPortEnd);
 	}
-
+*/
 }

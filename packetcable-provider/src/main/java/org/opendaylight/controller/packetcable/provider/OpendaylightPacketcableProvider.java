@@ -2,10 +2,12 @@ package org.opendaylight.controller.packetcable.provider;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -28,6 +30,7 @@ import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.Action;
@@ -64,7 +67,11 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.N
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdated;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdatedBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.DocsisServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.Apps;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.Subs;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcRemoveFlow;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowOriginal;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowUpdated;
@@ -117,7 +124,9 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	private DataBroker dataBroker;
 	private ListenerRegistration<DataChangeListener> listenerRegistration;
 	private List<InstanceIdentifier<?>> cmtsInstances;
-	private Map<String, InstanceIdentifier<?>> cmtsInstanceMap;
+	private Map<String, CmtsNode> cmtsNodeMap = Maps.newConcurrentMap();
+	private Map<String, Map<String, Map<String, Map<String, Flows>>>> flowMap =
+			new ConcurrentHashMap<String, Map<String, Map<String, Map<String, Flows>>>>();
 	private PCMMDataProcessor pcmmDataProcessor;
 	private PcmmService pcmmService;
 
@@ -127,7 +136,7 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	public OpendaylightPacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
 		cmtsInstances = Lists.newArrayList();
-		cmtsInstanceMap = Maps.newConcurrentMap();
+		flowMap = Maps.newConcurrentMap();
 		pcmmDataProcessor = new PCMMDataProcessor();
 		pcmmService = new PcmmService();
 	}
@@ -237,105 +246,206 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 	/**
 	 * Implemented from the DataChangeListener interface.
 	 */
-	private CmtsNode getCmtsNode(Map<InstanceIdentifier<?>, DataObject> thisData) {
-		CmtsNode cmtsNode = null;
-		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-			if (entry.getValue() instanceof CmtsNode) {
-	            cmtsNode = (CmtsNode)entry.getValue();
-	        }
-	    }
-		return cmtsNode;
+
+	private class InstanceData {
+		public Map<String, String> flowPathMap;
+		public String cmtsId;
+		public CmtsNode cmtsNode;
+		public String flowPath;
+		public String flowId;
+		public Flows flow;
+
+		public InstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			flowPathMap = getFlowPathMap(thisData);
+			if (flowPathMap.containsKey("cmtsId")) {
+				cmtsId = flowPathMap.get("cmtsId");
+				flowPath = cmtsId;
+				cmtsNode = getCmtsNode(thisData);
+			}
+			if (flowPathMap.containsKey("flowId")) {
+				flowId = flowPathMap.get("flowId");
+				flowPath = flowPathMap.get("cmtsId") + "/" + flowPathMap.get("appId") + "/" +
+						flowPathMap.get("subId") + "/" + flowPathMap.get("flowId");
+				flow = getFlow(thisData);
+			}
+		}
+
+		private Map<String, String> getFlowPathMap(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			// get the flow path keys from the InstanceIdentifier Map key set
+			Map<String, String> flowPathMap = new HashMap<String, String>();
+			InstanceIdentifier<?> nodesInstance = thisData.keySet().iterator().next();
+
+			InstanceIdentifier<Node> cmtsNodeInstance = nodesInstance.firstIdentifierOf(Node.class);
+			if (cmtsNodeInstance != null) {
+				String cmtsId = InstanceIdentifier.keyOf(cmtsNodeInstance).getId().getValue();
+				flowPathMap.put("cmtsId", cmtsId);
+			}
+
+			InstanceIdentifier<Apps> appsInstance = nodesInstance.firstIdentifierOf(Apps.class);
+			if (appsInstance != null) {
+				String appId = InstanceIdentifier.keyOf(appsInstance).getAppId();
+				flowPathMap.put("appId", appId);
+			}
+
+			InstanceIdentifier<Subs> subsInstance = nodesInstance.firstIdentifierOf(Subs.class);
+			if (subsInstance != null) {
+				String subId = getIpAddressStr(InstanceIdentifier.keyOf(subsInstance).getSubId());
+				flowPathMap.put("subId", subId);
+			}
+
+			InstanceIdentifier<Flows> flowsInstance = nodesInstance.firstIdentifierOf(Flows.class);
+			if (flowsInstance != null) {
+				String flowId = InstanceIdentifier.keyOf(flowsInstance).getFlowId();
+				flowPathMap.put("flowId", flowId);
+			}
+
+			return flowPathMap;
+		}
+
+		private CmtsNode getCmtsNode(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			//	{InstanceIdentifier{
+			//		targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
+			//		path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+			//				org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+			//					key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+			//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
+			//				org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
+			//	}=CmtsNode{
+			//		getAddress=IpAddress [_ipv4Address=Ipv4Address [_value=192.168.1.2], _value=[1, 9, 2, ., 1, 6, 8, ., 1, ., 2]],
+			//		getPort=PortNumber [_value=3918],
+			//		augmentations={}
+			//	}}
+			CmtsNode cmtsNode = null;
+			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
+				if (entry.getValue() instanceof CmtsNode) {
+		            cmtsNode = (CmtsNode)entry.getValue();
+		        }
+		    }
+			return cmtsNode;
+		}
+
+		private Flows getFlow(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			//{KeyedInstanceIdentifier{
+			//	targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows,
+			//	path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+			//	org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+			//		key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows,
+			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.Apps[
+			//		key=AppsKey [_appId=testApp]],
+			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.Subs[
+			//		key=SubsKey [_subId=IpAddress [_ipv4Address=Ipv4Address [_value=44.137.1.20], _value=[4, 4, ., 1, 3, 7, ., 1, ., 2, 0]]]],
+			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows[
+			//		key=FlowsKey [_flowId=ipvideo_dn-2]]]
+			//	}=Flows{
+			//		getFlowId=ipvideo_dn-2, getServiceClassName=ipvideo_dn, augmentations={}}}
+
+			Flows flow = null;
+			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
+				if (entry.getValue() instanceof Flows) {
+		            flow = (Flows)entry.getValue();
+		        }
+		    }
+			return flow;
+		}
+
+
 	}
+
+	private String getIpAddressStr(IpAddress ipAddress) {
+		String ipAddr = "";
+		Ipv4Address ipv4 = ipAddress.getIpv4Address();
+		Ipv6Address ipv6 = ipAddress.getIpv6Address();
+		ipAddr = ipv4.getValue();
+		if (ipAddr == "") {
+			ipAddr = ipv6.getValue();
+		}
+		return ipAddr;
+	}
+
 
 	private enum ChangeAction {created, updated, removed};
 
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
 		ChangeAction changeAction = null;
-		Map<InstanceIdentifier<?>, DataObject> changedData = null;
-		Map<InstanceIdentifier<?>, DataObject> originalData = null;
-		Set<InstanceIdentifier<?>> removedData = null;
-		//	{InstanceIdentifier{
-		//		targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode,
-		//		path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
-		//				org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
-		//			key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
-		//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode,
-		//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode]
-		//	}=CmtsNode{
-		//		getAddress=IpAddress [_ipv4Address=Ipv4Address [_value=192.168.1.2], _value=[1, 9, 2, ., 1, 6, 8, ., 1, ., 2]],
-		//		getPort=PortNumber [_value=3918],
-		//		augmentations={}
-		//	}}
+		Map<InstanceIdentifier<?>, DataObject> createdData = change.getCreatedData();
+		Map<InstanceIdentifier<?>, DataObject> updatedData = change.getUpdatedData();
+		Map<InstanceIdentifier<?>, DataObject> originalData = change.getOriginalData();
+		Set<InstanceIdentifier<?>> removedData = change.getRemovedPaths();
+		InstanceData thisData = null;
 
 		// Determine what change action took place by looking at the change object's InstanceIdentifier sets
-		changedData = change.getCreatedData();
-		if (! changedData.isEmpty()) {
+		if (! createdData.isEmpty()) {
 			changeAction = ChangeAction.created;
-			originalData = changedData;
-		} else {
-			changedData = change.getUpdatedData();
-			if (! changedData.isEmpty()) {
+			thisData = new InstanceData(createdData);
+		} else if (! removedData.isEmpty()) {
+			changeAction = ChangeAction.removed;
+			thisData = new InstanceData(originalData);
+		} else if (! updatedData.isEmpty()) {
 				changeAction = ChangeAction.updated;
-				originalData = change.getOriginalData();
-			} else {
-				removedData = change.getRemovedPaths();
-				if (! removedData.isEmpty()) {
-					changeAction = ChangeAction.removed;
-					originalData = change.getOriginalData();
-					changedData = originalData;
-				} else {
-					// we should not be here -- complain bitterly and return
-					logger.error("onDataChanged(): Unknown change action: " + change);
-					return;
-				}
-			}
+				thisData = new InstanceData(updatedData);
+		} else {
+				// we should not be here -- complain bitterly and return
+				logger.error("onDataChanged(): Unknown change action: " + change);
+				return;
 		}
 
-		// get the CMTS identity from the InstanceIdentifier Map key
-		InstanceIdentifier<?> nodesInstance = originalData.keySet().iterator().next();
-		InstanceIdentifier<Node> cmtsNodeInstance = nodesInstance.firstIdentifierOf(Node.class);
-		String cmtsId = InstanceIdentifier.keyOf(cmtsNodeInstance).getId().getValue();
+		// get the CMTS node identity from the Instance Data
+		String cmtsId = thisData.cmtsId;
 
-		// get the CMTS parameters from the CmtsNode in the Map entry
-		CmtsNode cmtsNode = getCmtsNode(changedData);
-        IpAddress address = cmtsNode.getAddress();
-        Ipv4Address ipv4Address = address.getIpv4Address();
-        String ipv4AddressStr = ipv4Address.getValue();
-        PortNumber port = cmtsNode.getPort();
-        Integer portNum = port.getValue();
 
 		// select the change action
-		InstanceIdentifier<?> thisCmtsInstance = null;
-		TransactionId transactionId = TransactionId.getDefaultInstance("1234");
+		CmtsNode lastCmtsNode = null;
+		CmtsNode thisCmtsNode = null;
+		Apps lastApp = null;
+		Apps thisApp = null;
+		Flows lastFlow = null;
+		Flows thisFlow = null;
 		switch (changeAction) {
 		case created:
-			logger.info("onDataChanged(): created " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
-			cmtsInstanceMap.put(cmtsId, nodesInstance);
-			pcmmService.addCmts(cmtsNode);
+			// get the CMTS parameters from the CmtsNode in the Map entry (if new CMTS)
+			thisCmtsNode = thisData.cmtsNode;
+			if (thisCmtsNode != null) {
+				logger.info("onDataChanged(): created CMTS Node " + thisData.flowPath + "/" + thisCmtsNode);
+				cmtsNodeMap.put(cmtsId, thisCmtsNode);
+				pcmmService.addCmts(thisCmtsNode);
+			}
+			// get the PCMM flow parameters from the cmtsId/appId/subId/flowId path in the Maps entry (if new flow)
+			thisFlow = thisData.flow;
+			if (thisFlow != null) {
+				String scn = thisFlow.getServiceClassName();
+				String flowPath = thisData.flowPath;
+				logger.info("onDataChanged(): created Flow for SCN: " + scn + " @ " + flowPath + "/" + thisFlow);
+			}
 			break;
 		case updated:
-			logger.info("onDataChanged(): updated " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
-			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
-			if (! thisCmtsInstance.equals(nodesInstance)) {
-				logger.error("onDataChanged(): updated " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " ***VS*** " + nodesInstance);
-				return;
+			thisCmtsNode = thisData.cmtsNode;
+			if (thisCmtsNode != null) {
+				lastCmtsNode = cmtsNodeMap.get(cmtsId);
+				logger.info("onDataChanged(): updated " + cmtsId + ": FROM: " + lastCmtsNode + " TO: " + thisCmtsNode);
+				cmtsNodeMap.put(cmtsId, thisCmtsNode);
+				// remove original cmtsNode
+				pcmmService.removeCmts(lastCmtsNode);
+				// and add back the new one
+				pcmmService.addCmts(thisCmtsNode);
 			}
-			cmtsInstanceMap.put(cmtsId, nodesInstance);
-			// remove original cmtsNode
-			pcmmService.removeCmts(getCmtsNode(originalData));
-			// and add back the new one
-			pcmmService.addCmts(cmtsNode);
+			thisFlow = thisData.flow;
+			if (thisFlow != null) {
+				logger.info("onDataChanged(): updated Flow: " + thisData.flowPath + "/" + thisFlow);
+			}
 			break;
 		case removed:
-			logger.info("onDataChanged(): removed " + cmtsId + " @ " + ipv4AddressStr + ":" + portNum);
-			thisCmtsInstance = cmtsInstanceMap.get(cmtsId);
-			if (! thisCmtsInstance.equals(nodesInstance)) {
-				logger.error("onDataChanged(): removed " + cmtsId + " Unknown CMTS instance " + thisCmtsInstance + " ***VS*** " + nodesInstance);
-				return;
+			thisFlow = thisData.flow;
+			if (thisFlow != null) {
+				logger.info("onDataChanged(): removed Flow: " + thisData.flowPath + "/" + thisFlow);
 			}
-			cmtsInstanceMap.remove(cmtsId);
-			pcmmService.removeCmts(cmtsNode);
+			thisCmtsNode = thisData.cmtsNode;
+			if (thisCmtsNode != null) {
+				logger.info("onDataChanged(): removed " + thisData.flowPath + "/" + thisCmtsNode);
+				cmtsNodeMap.remove(cmtsId);
+				pcmmService.removeCmts(thisCmtsNode);
+			}
 			break;
 		default:
 			// we should not be here -- complain bitterly and return

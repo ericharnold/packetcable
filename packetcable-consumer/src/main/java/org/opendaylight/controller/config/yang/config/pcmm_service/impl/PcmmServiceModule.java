@@ -23,12 +23,10 @@ public class PcmmServiceModule
 
 	@Override
 	public java.lang.AutoCloseable createInstance() {
-		// PacketcableServiceService packetcableServiceService =
-		// getRpcRegistryDependency().getRpcService(PacketcableServiceService.class);
-		final PcmmService pcmmService = new PcmmServiceImpl();
-		final Registration pcmmListenerReg = getNotificationServiceDependency().registerNotificationListener(pcmmService);
-		final PcmmServiceRuntimeRegistration runtimeReg = getRootRuntimeBeanRegistratorWrapper().register(pcmmService);
-		return new AutoCloseablePcmmService(pcmmListenerReg, runtimeReg);
+		// PacketcableServiceService packetcableServiceService = getRpcRegistryDependency().getRpcService(PacketcableServiceService.class);
+//		final PcmmService pcmmService = new PcmmServiceImpl();
+//		final PcmmServiceRuntimeRegistration runtimeReg = getRootRuntimeBeanRegistratorWrapper().register(pcmmService);
+		return new AutoCloseablePcmmService(null, null);
 	}
 
 	class AutoCloseablePcmmService extends PcmmServiceImpl implements

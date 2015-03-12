@@ -5,9 +5,6 @@ import java.util.Map;
 
 import org.opendaylight.controller.org.pcmm.api.PcmmService;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsAdded;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsRemoved;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdated;
 import org.pcmm.rcd.IPCMMPolicyServer;
 import org.pcmm.rcd.IPCMMPolicyServer.IPSCMTSClient;
 import org.pcmm.rcd.impl.PCMMPolicyServer;
@@ -26,7 +23,7 @@ public class PcmmServiceImpl implements PcmmService {
 		policyServer = new PCMMPolicyServer();
 		cmtsClients = Maps.newConcurrentMap();
 	}
-
+/* ###
 	@Override
 	public void onCmtsAdded(CmtsAdded notification) {
 //		String ipv4 = notification.getAddress().getIpv4Address().getValue();
@@ -47,7 +44,9 @@ public class PcmmServiceImpl implements PcmmService {
 	@Override
 	public void onCmtsUpdated(CmtsUpdated notification) {
 		// TODO
-	}
+
+
+### */
 
 	@Override
 	public Boolean sendGateDelete() {

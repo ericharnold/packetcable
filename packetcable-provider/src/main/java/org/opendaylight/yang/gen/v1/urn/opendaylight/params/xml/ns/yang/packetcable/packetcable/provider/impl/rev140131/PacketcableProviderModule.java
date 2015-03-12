@@ -27,7 +27,6 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
     @Override
     public java.lang.AutoCloseable createInstance() {
         OpendaylightPacketcableProvider provider = new OpendaylightPacketcableProvider();
-        this.getBrokerDependency().registerProvider(provider, null);
 
         DataBroker dataBrokerService = getDataBrokerDependency();
         provider.setDataProvider(dataBrokerService);
@@ -37,7 +36,7 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
                         provider.nodeIID, provider, DataBroker.DataChangeScope.SUBTREE );
 
 
-        logger.info("PacketCableProvider Registered with Broker");
+        logger.info("PacketCableProvider Registered with DataBroker");
         return provider;
     }
 

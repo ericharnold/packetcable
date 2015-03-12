@@ -32,7 +32,7 @@ module packetcable-provider-impl {
         case packetcable-provider-impl {
             when "/config:modules/config:module/config:type = 'packetcable-provider-impl'";
 
-		      //wires in the data-broker service
+		      //wires in the data-broker and rpc services
 		      container data-broker {
 		        uses config:service-ref {
 		          refine type {
@@ -41,15 +41,22 @@ module packetcable-provider-impl {
 		          }
 		        }
 		      }
-
-            container broker {
-                uses config:service-ref {
-                    refine type {
-                        mandatory true;
-                        config:required-identity mdsal:binding-broker-osgi-registry;
-                    }
-                }
-            }
+		      container rpc-registry {
+		        uses config:service-ref {
+		          refine type {
+		             mandatory true;
+		             config:required-identity mdsal:binding-rpc-registry;
+		          }
+		        }
+		      }
+//            container broker {
+//               uses config:service-ref {
+//                    refine type {
+//                        mandatory true;
+//                        config:required-identity mdsal:binding-broker-osgi-registry;
+//                    }
+//                }
+//            }
         }
     }
 }

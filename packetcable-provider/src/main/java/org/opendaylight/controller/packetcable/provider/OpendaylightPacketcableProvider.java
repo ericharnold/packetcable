@@ -68,12 +68,14 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.N
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdated;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.broker.rev140909.CmtsUpdatedBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.CmtsCapableNode;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.DocsisServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.nodes.node.CmtsNode;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.Apps;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.AppsKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.Subs;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.SubsKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.FlowsKey;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcRemoveFlow;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowOriginal;
 //import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcUpdateFlowUpdated;
@@ -253,9 +255,12 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		public String cmtsId;
 		public CmtsNode cmtsNode;
 		public List<Flows> flowList = new ArrayList<Flows>();
+		public List<String> removePathList = new ArrayList<String>();
 
 		public InstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
-			getFlowPathMap(thisData);
+			// only used to parse createdData or updatedData
+			InstanceIdentifier<?> nodesInstance = thisData.keySet().iterator().next();
+			getFlowPathMap(nodesInstance);
 			getCmtsNode(thisData);
 			if (cmtsNode != null) {
 				cmtsId = flowPathMap.get("cmtsId");
@@ -267,10 +272,21 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			}
 		}
 
-		private void getFlowPathMap(Map<InstanceIdentifier<?>, DataObject> thisData) {
+		public InstanceData(Set<InstanceIdentifier<?>> thisData) {
+			// only used to parse the removedData paths
+			for (InstanceIdentifier<?> removeThis : thisData) {
+				getFlowPathMap(removeThis);
+				if (flowPathMap.containsKey("flowId")) {
+					flowPath = flowPathMap.get("cmtsId") + "/" + flowPathMap.get("appId") + "/" + flowPathMap.get("subId") +
+							"/" + flowPathMap.get("flowId");
+				} else {
+					flowPath = flowPathMap.get("cmtsId");
+				}
+				removePathList.add(flowPath);
+			}
+		}
+		private void getFlowPathMap(InstanceIdentifier<?> nodesInstance) {
 			// get the flow path keys from the InstanceIdentifier Map key set if they are there
-			InstanceIdentifier<?> nodesInstance = thisData.keySet().iterator().next();
-
 			InstanceIdentifier<Node> cmtsNodeInstance = nodesInstance.firstIdentifierOf(Node.class);
 			if (cmtsNodeInstance != null) {
 				String cmtsId = InstanceIdentifier.keyOf(cmtsNodeInstance).getId().getValue();
@@ -278,13 +294,27 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			}
 			InstanceIdentifier<Apps> appsInstance = nodesInstance.firstIdentifierOf(Apps.class);
 			if (appsInstance != null) {
-				String appId = InstanceIdentifier.keyOf(appsInstance).getAppId();
-				flowPathMap.put("appId", appId);
+				AppsKey appKey = InstanceIdentifier.keyOf(appsInstance);
+				if (appKey != null) {
+					String appId = appKey.getAppId();
+					flowPathMap.put("appId", appId);
+				}
 			}
 			InstanceIdentifier<Subs> subsInstance = nodesInstance.firstIdentifierOf(Subs.class);
 			if (subsInstance != null) {
-				String subId = getIpAddressStr(InstanceIdentifier.keyOf(subsInstance).getSubId());
-				flowPathMap.put("subId", subId);
+				SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
+				if (subKey != null) {
+					String subId = getIpAddressStr(subKey.getSubId());
+					flowPathMap.put("subId", subId);
+				}
+			}
+			InstanceIdentifier<Flows> flowsInstance = nodesInstance.firstIdentifierOf(Flows.class);
+			if (flowsInstance != null) {
+				FlowsKey flowKey = InstanceIdentifier.keyOf(flowsInstance);
+				if (flowKey != null) {
+					String flowId = flowKey.getFlowId();
+					flowPathMap.put("flowId", flowId);
+				}
 			}
 		}
 
@@ -309,50 +339,50 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		}
 
 		private void getFlows(Map<InstanceIdentifier<?>, DataObject> thisData) {
-			//{KeyedInstanceIdentifier{
-			//	targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows,
-			//	path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
-			//	org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
-			//		key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
-			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows,
-			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.Apps[
-			//		key=AppsKey [_appId=testApp]],
-			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.Subs[
-			//		key=SubsKey [_subId=IpAddress [_ipv4Address=Ipv4Address [_value=44.137.1.20], _value=[4, 4, ., 1, 3, 7, ., 1, ., 2, 0]]]],
-			//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows[
-			//		key=FlowsKey [_flowId=ipvideo_dn-2]]]
-			//	}=Flows{
-			//		getFlowId=ipvideo_dn-2, getServiceClassName=ipvideo_dn, augmentations={}}}
-
-			Flows flow = null;
+			// {InstanceIdentifier{
+			//		targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows,
+			//		path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+			//		org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+			//			key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+			//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows]
+			//	}=PcmmFlows{
+			//		getApps=[Apps{getAppId=testApp,
+			//		getSubs=[Subs{getSubId=IpAddress [_ipv4Address=Ipv4Address [_value=44.137.1.20], _value=[4, 4, ., 1, 3, 7, ., 1, ., 2, 0]],
+			//		getFlows=[Flows{getFlowId=ipvideo_dn-1, getServiceClassName=ipvideo_dn, augmentations={}}],
+			//		augmentations={}}], augmentations={}}]},
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-				if (entry.getValue() instanceof Flows) {
-		            flow = (Flows)entry.getValue();
-		            flowList.add(flow);
+				if (entry.getValue() instanceof PcmmFlows) {
+					PcmmFlows pcmmFlow = (PcmmFlows)entry.getValue();
+					Apps app = pcmmFlow.getApps().iterator().next();
+					String appId = app.getAppId();
+					flowPathMap.put("appID", appId);
+					Subs sub = app.getSubs().iterator().next();
+					String subId = getIpAddressStr(sub.getSubId());
+					flowPathMap.put("subId", subId);
+					flowList.addAll(sub.getFlows());
 		        }
 		    }
-			if (flow == null) {
-				// {InstanceIdentifier{
-				//		targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows,
-				//		path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
-				//		org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
-				//			key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
-				//		org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows]
-				//	}=PcmmFlows{
-				//		getApps=[Apps{getAppId=testApp,
-				//		getSubs=[Subs{getSubId=IpAddress [_ipv4Address=Ipv4Address [_value=44.137.1.20], _value=[4, 4, ., 1, 3, 7, ., 1, ., 2, 0]],
-				//		getFlows=[Flows{getFlowId=ipvideo_dn-1, getServiceClassName=ipvideo_dn, augmentations={}}],
-				//		augmentations={}}], augmentations={}}]},
+			if (flowList.isEmpty()) {
+				//{KeyedInstanceIdentifier{
+				//	targetType=interface org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows,
+				//	path=[org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes,
+				//	org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node[
+				//		key=NodeKey [_id=Uri [_value=cmts:192.168.1.2]]],
+				//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.PcmmFlows,
+				//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.Apps[
+				//		key=AppsKey [_appId=testApp]],
+				//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.Subs[
+				//		key=SubsKey [_subId=IpAddress [_ipv4Address=Ipv4Address [_value=44.137.1.20], _value=[4, 4, ., 1, 3, 7, ., 1, ., 2, 0]]]],
+				//	org.opendaylight.yang.gen.v1.urn.opendaylight.node.cmts.rev140909.pcmm.apps.apps.subs.Flows[
+				//		key=FlowsKey [_flowId=ipvideo_dn-2]]]
+				//	}=Flows{
+				//		getFlowId=ipvideo_dn-2, getServiceClassName=ipvideo_dn, augmentations={}}}
+
+				Flows flow = null;
 				for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-					if (entry.getValue() instanceof PcmmFlows) {
-						PcmmFlows pcmmFlow = (PcmmFlows)entry.getValue();
-						Apps app = pcmmFlow.getApps().iterator().next();
-						String appId = app.getAppId();
-						flowPathMap.put("appID", appId);
-						Subs sub = app.getSubs().iterator().next();
-						String subId = getIpAddressStr(sub.getSubId());
-						flowPathMap.put("subId", subId);
-						flowList.addAll(sub.getFlows());
+					if (entry.getValue() instanceof Flows) {
+			            flow = (Flows)entry.getValue();
+			            flowList.add(flow);
 			        }
 			    }
 			}
@@ -388,7 +418,7 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			thisData = new InstanceData(createdData);
 		} else if (! removedData.isEmpty()) {
 			changeAction = ChangeAction.removed;
-			thisData = new InstanceData(originalData);
+			thisData = new InstanceData(removedData);
 		} else if (! updatedData.isEmpty()) {
 				changeAction = ChangeAction.updated;
 				thisData = new InstanceData(updatedData);
@@ -398,11 +428,8 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 				return;
 		}
 
-		// get the CMTS node identity from the Instance Data
-		String cmtsId = thisData.cmtsId;
-
-
 		// select the change action
+		String cmtsId = null;
 		CmtsNode lastCmtsNode = null;
 		CmtsNode thisCmtsNode = null;
 		Flows lastFlow = null;
@@ -412,6 +439,8 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			// get the CMTS parameters from the CmtsNode in the Map entry (if new CMTS)
 			thisCmtsNode = thisData.cmtsNode;
 			if (thisCmtsNode != null) {
+				// get the CMTS node identity from the Instance Data
+				cmtsId = thisData.cmtsId;
 				logger.info("onDataChanged(): created CMTS Node " + thisData.flowPath + "/" + thisCmtsNode);
 				cmtsNodeMap.put(cmtsId, thisCmtsNode);
 				pcmmService.addCmts(thisCmtsNode);
@@ -419,7 +448,6 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			// get the PCMM flow parameters from the cmtsId/appId/subId/flowId path in the Maps entry (if new flow)
 			for (Flows flow : thisData.flowList) {
 				String flowId = flow.getFlowId();
-				String scn = flow.getServiceClassName();
 				String flowPathStr = thisData.flowPath + "/" + flowId ;
 				flowMap.put(flowPathStr, flow);
 				logger.info("onDataChanged(): created Flow: " + flowId + " @ " + flowPathStr + "/" + flow);
@@ -428,6 +456,8 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 		case updated:
 			thisCmtsNode = thisData.cmtsNode;
 			if (thisCmtsNode != null) {
+				// get the CMTS node identity from the Instance Data
+				cmtsId = thisData.cmtsId;
 				lastCmtsNode = cmtsNodeMap.get(cmtsId);
 				logger.info("onDataChanged(): updated " + cmtsId + ": FROM: " + lastCmtsNode + " TO: " + thisCmtsNode);
 				cmtsNodeMap.put(cmtsId, thisCmtsNode);
@@ -438,7 +468,6 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			}
 			for (Flows flow : thisData.flowList) {
 				String flowId = flow.getFlowId();
-				String scn = flow.getServiceClassName();
 				String flowPathStr = thisData.flowPath + "/" + flowId ;
 				lastFlow = flowMap.get(flowPathStr);
 				logger.info("onDataChanged(): updated Flow: FROM: " + flowPathStr + "/" + lastFlow + " TO: " + flow);
@@ -446,17 +475,19 @@ public class OpendaylightPacketcableProvider implements DataChangeListener,
 			break;
 		case removed:
 			// remove flows before removing CMTS
-			for (Flows flow : thisData.flowList) {
-				String flowId = flow.getFlowId();
-				String flowPathStr = thisData.flowPath + "/" + flowId ;
-				lastFlow = flowMap.remove(flowPathStr);
-				logger.info("onDataChanged(): removed Flow: " + flowPathStr + "/" + lastFlow);
+			for (String flowPathStr: thisData.removePathList) {
+				if (flowMap.containsKey(flowPathStr)) {
+					lastFlow = flowMap.remove(flowPathStr);
+					logger.info("onDataChanged(): removed Flow: " + flowPathStr + "/" + lastFlow);
+				}
 			}
-			thisCmtsNode = thisData.cmtsNode;
-			if (thisCmtsNode != null) {
-				logger.info("onDataChanged(): removed " + thisData.flowPath + "/" + thisCmtsNode);
-				cmtsNodeMap.remove(cmtsId);
-				pcmmService.removeCmts(thisCmtsNode);
+			for (String cmtsIdStr: thisData.removePathList) {
+				if (cmtsNodeMap.containsKey(cmtsIdStr)) {
+					thisCmtsNode = cmtsNodeMap.remove(cmtsIdStr);
+					logger.info("onDataChanged(): removed " + cmtsIdStr + "/" + thisCmtsNode);
+					cmtsNodeMap.remove(cmtsIdStr);
+					pcmmService.removeCmts(thisCmtsNode);
+				}
 			}
 			break;
 		default:

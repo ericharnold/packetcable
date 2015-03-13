@@ -5,16 +5,9 @@ module packetcable-cmts
 
     import ietf-yang-types 	{ prefix yang; }
     import ietf-inet-types 	{ prefix inet; }
+    import opendaylight-l2-types {prefix odl-l2;}
     import opendaylight-inventory {prefix inv;revision-date "2013-08-19";}
     import yang-ext {prefix ext; revision-date "2013-07-09";}
-//    import ietf-interfaces 	{ prefix if;   }
-//    import ietf-snmp    	{ prefix snmp; }
-//    import ietf-reverse-ssh    	{ prefix rssh; }
-
-//    import packetcable-traffic-profile { prefix traffic; revision-date "2014-09-08"; }
-//	  import packetcable-match-types { prefix match; revision-date "2014-09-09"; }
-//    import flow-node-inventory {prefix fni; revision-date 2013-08-19; }
-
 
     description "This module contains a collection of CMTS definitions";
     organization "OpenDaylight Project";
@@ -78,50 +71,116 @@ module packetcable-cmts
     	}
     }
 
+    grouping pcmm-flow-attributes {
+     	uses pcmm-traffic-profile;
+     	uses pcmm-flow-match;
+    }
+    
+    typedef flow-direction {
+	    type enumeration {
+		      enum us {
+		        value "1";
+		        description "Upstream service flow.";
+		      }
+		      enum ds {
+		        value "2";
+		        description "Downstream service flow.";
+		      }
+	  	}
+    	description "This value represents the service flow direction.";
+  	}
+    
+    grouping pcmm-traffic-profile {
+    	container traffic-profile {
+		    leaf service-class-name {
+		        type string;
+		        description "
+			        length 2 to 128 max
+			        The Service Class Name is MUST be 2-128 bytes of null-terminated ASCII string. 
+			        (Refer to section C.2.2.3.4 of [MULPI]).  This name MUST be padded with null bytes 
+			        to align on a 4-byte boundary.
+		        ";
+		    }
+			leaf direction {
+				type flow-direction;
+				description "Service Flow Direction (must match SCN attributes)";
+			}
+		}
+    }
+    
+	 typedef tp-protocol {
+	    type enumeration {
+		      enum tcp_or_udp {
+		        value "256";
+		        description "Either TCP or UDP protocol match.";
+		      }
+		      enum tcp {
+		        value "6";
+		        description "TCP protocol match.";
+		      }
+		      enum udp {
+		        value "17";
+		        description "UDP protocol match.";
+		      }
+	    }
+	    description "This value represents the IP transport protocol (or Next Header).";
+	  }
+  
+      grouping tp-port-match-ranges {
+        container port-match-ranges {
+            leaf tpSrc-start {
+                type inet:port-number;
+                description "Transport source port start.";
+            }
+            leaf tpSrc-end {
+                type inet:port-number;
+                description "Transport source port end.";
+            }
+            leaf tpDst-start {
+                type inet:port-number;
+                description "Transport destination port start.";
+            }
+            leaf tpDst-end {
+                type inet:port-number;
+                description "Transport destination port end.";
+            }
+        }
+    }
+     
+    grouping pcmm-flow-match {
+    	container match {
+	    	leaf nwSrc {
+	    		type inet:ip-prefix;
+	    		description "Source IP prefix match in  <address/len> notation";
+			}
+	    	leaf nwDst {
+	    		type inet:ip-prefix;
+	    		description "Destination IP prefix match in <address/len> notation";
+			}
+	 		leaf nwDscp {
+	 			type inet:dscp;
+	 			description "DSCP match";
+	 		}
+	     	leaf proto {
+	    		type tp-protocol;
+	    		description "IP transport protocol (or Next Header)";
+			}
+	 		leaf tpSrc {
+		        type inet:port-number;
+	    		description "Transport source port (exact match).";
+	   		}    	
+	 		leaf tpDst {
+		        type inet:port-number;
+	    		description "Transport destination port (exact match).";
+	   		}
+	   		uses tp-port-match-ranges; 
+   		}   	
+    }
+    
     augment "/inv:nodes/inv:node" {
     	ext:augment-identifier "pcmm-flows";
     	uses pcmm-apps;
 	}
     
-    grouping docsis-service-class-name {
-	    leaf service-class-name {
-	        type string;
-            description "
-		        length 2 to 128 max
-		        The Service Class Name is MUST be 2-128 bytes of null-terminated ASCII string. 
-		        (Refer to section C.2.2.3.4 of [MULPI]).  This name MUST be padded with null bytes 
-		        to align on a 4-byte boundary.
-	        ";
-	    }
-    }
-    
-    grouping pcmm-flow-attributes {
-     	uses docsis-service-class-name;
-    }
-
-/* ###
-    // from packetcable-traffic-profile
-    augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:instructions/fni:instruction/fni:instruction/fni:write-actions-case/fni:write-actions/fni:action/fni:action" {
-        case "docsis-service-class-name-case" { container docsis-service-class-name {uses traffic-profile-docsis-service-class-name-attributes; } }
-    }
-    augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:instructions/fni:instruction/fni:instruction/fni:apply-actions-case/fni:apply-actions/fni:action/fni:action" {
-        case "docsis-service-class-name-case" { container docsis-service-class-name {uses traffic-profile-docsis-service-class-name-attributes; } }
-    }
- 
-    // from packetcable-match-types
-    augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:match" {
-        ext:augment-identifier "subscriber-id-nodes-node-table-flow";
-        uses match:subscriber-id;
-    }
-    augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:match" {
-        ext:augment-identifier "udp-match-ranges-nodes-node-table-flow";
-        uses match:udp-match-ranges-attributes;
-    }
-    augment "/inv:nodes/inv:node/fni:table/fni:flow/fni:match" {
-        ext:augment-identifier "tcp-match-ranges-nodes-node-table-flow";
-        uses match:tcp-match-ranges-attributes;
-    }
- ### */
-
 }
 

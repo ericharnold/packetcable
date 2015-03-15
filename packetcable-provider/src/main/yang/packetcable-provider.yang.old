@@ -19,7 +19,9 @@ module packetcable-provider {
     }
 
     identity packetcable-provider{
-        base config:service-type;
-        config:java-class "org.opendaylight.controller.packetcable.provider.OpenDaylightPacketCableProviderService";
+    	base config:module-type;
+    	
+//        base config:service-type;
+//        config:java-class "org.opendaylight.controller.packetcable.provider.OpenDaylightPacketCableProviderService";
     }
 }

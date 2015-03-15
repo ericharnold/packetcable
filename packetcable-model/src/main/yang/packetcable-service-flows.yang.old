@@ -1,52 +1,38 @@
-module packetcable-cmts
+module packetcable
 {
-    namespace "urn:opendaylight:node:cmts";
-    prefix "cmts";
+    namespace "urn:packetcable";
+    prefix "qos";
 
     import ietf-yang-types 	{ prefix yang; }
     import ietf-inet-types 	{ prefix inet; }
-    import opendaylight-l2-types {prefix odl-l2;}
-    import opendaylight-inventory {prefix inv;revision-date "2013-08-19";}
-    import yang-ext {prefix ext; revision-date "2013-07-09";}
 
-    description "This module contains a collection of CMTS definitions";
+    description "This module contains the PCMM Service Flow definitions";
     organization "OpenDaylight Project";
 
-    revision 2014-09-09 {
-        description "Initial revision of packetcable cmts";
+    revision 2015-03-14 {
+        description "Initial revision of PCMM Service Flows";
     }        
-
-    grouping cmts-node-attributes {
-        description "A PCMM capable CMTS and other available configuration resources.";
-        
-        leaf address {
-            type inet:ip-address;
-            description "IP Address of CMTS";
-        }
-        
-        leaf port {
-            type inet:port-number;
-            description "TCP port number to connect";
-            default 3918;
-        }
-        
-        leaf connected {
-            type boolean;
-            description "CMTS connected state";
-            default false;
-        }
-    }
-        
-    augment "/inv:nodes/inv:node" {
-        ext:augment-identifier "cmts-capable-node";
-        container cmts-node {
-            uses cmts-node-attributes;
-        }
+   
+    // PCMM QoS service flows
+    container qos {
+    	description "
+    		PCMM QoS Dynamic Service Flows are organized as a tree by Application/Subscriber/ServiceFlow:
+    			Each Application is known by its appId which is any string.
+    			Each Subscriber is known by its subId which is a CPE IP address in either IPv4 or IPv6 format.
+    			Each ServiceFlow is known by its sfId which is any string.
+    		
+    		The subscriber's CPE IP address is used to locate the CCAP device that is currently hosting the
+    		the Cable Modem that is connected to the subscriber's device. Therefore, it is not necessary
+    		for the PCMM applications to know the topology of the CCAP devices and CMs in the network path 
+    		to their subscriber devices.
+    		
+    		Note that each CCAP entry contains a list of connected subscriber IP subnets as well as a list
+    		of all Service Class Names (SCNs) available on the CCAP device. 
+    		";
+		uses pcmm-qos-flows;
     }
     
-    // PCMM flows
-    
-    grouping pcmm-apps {
+    grouping pcmm-qos-flows {
         list apps {
             key "appId";
 		    leaf appId {
@@ -59,24 +45,24 @@ module packetcable-cmts
 		            type inet:ip-address;
 			    	description "Subscriber Identity";
 			    }
-	            list flows {
-	                key "flowId";
-				    leaf flowId {
+	            list dsfs {
+	                key "dsfId";
+				    leaf dsfId {
 				    	type string;
-				    	description "Flow Identity";
+				    	description "Dynamic Service Flow Identity";
 				    }
-				    uses pcmm-flow-attributes; 
+				    uses pcmm-qos-flow-attributes; 
 	            }
             }
     	}
     }
 
-    grouping pcmm-flow-attributes {
-     	uses pcmm-traffic-profile;
-     	uses pcmm-flow-match;
+    grouping pcmm-qos-flow-attributes {
+     	uses pcmm-qos-params;
+     	uses pcmm-qos-match;
     }
     
-    typedef flow-direction {
+    typedef service-flow-direction {
 	    type enumeration {
 		      enum us {
 		        value "1";
@@ -90,8 +76,8 @@ module packetcable-cmts
     	description "This value represents the service flow direction.";
   	}
     
-    grouping pcmm-traffic-profile {
-    	container traffic-profile {
+    grouping pcmm-qos-params {
+    	container qos-params {
 		    leaf service-class-name {
 		        type string;
 		        description "
@@ -102,8 +88,8 @@ module packetcable-cmts
 		        ";
 		    }
 			leaf direction {
-				type flow-direction;
-				description "Service Flow Direction (must match SCN attributes)";
+				type service-flow-direction;
+				description "Service Flow Direction (must match SCN dir attribute)";
 			}
 		}
     }
@@ -128,36 +114,36 @@ module packetcable-cmts
   
       grouping tp-port-match-ranges {
         container port-match-ranges {
-            leaf tpSrc-start {
+            leaf srcPort-begin {
                 type inet:port-number;
-                description "Transport source port start.";
+                description "TCP/UDP source port range begin.";
             }
-            leaf tpSrc-end {
+            leaf srcPort-end {
                 type inet:port-number;
-                description "Transport source port end.";
+                description "TCP/UDP source port range end.";
             }
-            leaf tpDst-start {
+            leaf dstPort-begin {
                 type inet:port-number;
-                description "Transport destination port start.";
+                description "TCP/UDP destination port range begin.";
             }
-            leaf tpDst-end {
+            leaf dstPort-end {
                 type inet:port-number;
-                description "Transport destination port end.";
+                description "TCP/UDP destination port range end.";
             }
         }
     }
      
-    grouping pcmm-flow-match {
+    grouping pcmm-qos-match {
     	container match {
-	    	leaf nwSrc {
+	    	leaf srcIp {
 	    		type inet:ip-prefix;
 	    		description "Source IP prefix match in  <address/len> notation";
 			}
-	    	leaf nwDst {
+	    	leaf dstIp {
 	    		type inet:ip-prefix;
 	    		description "Destination IP prefix match in <address/len> notation";
 			}
-	 		leaf nwDscp {
+	 		leaf dscp {
 	 			type inet:dscp;
 	 			description "DSCP match";
 	 		}
@@ -165,22 +151,16 @@ module packetcable-cmts
 	    		type tp-protocol;
 	    		description "IP transport protocol (or Next Header)";
 			}
-	 		leaf tpSrc {
+	 		leaf srcPort {
 		        type inet:port-number;
-	    		description "Transport source port (exact match).";
+	    		description "TCP/UDP source port (exact match).";
 	   		}    	
-	 		leaf tpDst {
+	 		leaf dstPort {
 		        type inet:port-number;
-	    		description "Transport destination port (exact match).";
+	    		description "TCP/UDP destination port (exact match).";
 	   		}
 	   		uses tp-port-match-ranges; 
    		}   	
-    }
-    
-    augment "/inv:nodes/inv:node" {
-    	ext:augment-identifier "pcmm-flows";
-    	uses pcmm-apps;
-	}
-    
+    }    
 }
 

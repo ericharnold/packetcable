@@ -7,7 +7,7 @@ module packetcable-provider-impl {
     import config { prefix config; revision-date 2013-04-05; }
     import rpc-context { prefix rpcx; revision-date 2013-06-17; }
     import opendaylight-md-sal-binding { prefix mdsal; revision-date 2013-10-28; }
-    import packetcable-provider { prefix pcp; revision-date 2014-01-31; }
+//    import packetcable-provider { prefix pcp; revision-date 2014-01-31; }
     import ietf-inet-types {prefix inet;revision-date 2010-09-24;}
 
     description
@@ -22,7 +22,7 @@ module packetcable-provider-impl {
     // This is the definition of the service implementation as a module identity.
     identity packetcable-provider-impl {
             base config:module-type;
-            config:provided-service pcp:packetcable-provider;
+            // config:provided-service pcp:packetcable-provider;
             // Specifies the prefix for generated java classes.
             config:java-name-prefix PacketcableProvider;
     }

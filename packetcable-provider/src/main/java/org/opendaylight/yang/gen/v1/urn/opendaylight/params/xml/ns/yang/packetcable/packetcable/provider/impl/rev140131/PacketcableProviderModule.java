@@ -31,9 +31,13 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
         DataBroker dataBrokerService = getDataBrokerDependency();
         provider.setDataProvider(dataBrokerService);
 
-        final ListenerRegistration<DataChangeListener> cmtsNodeDataChangeListenerRegistration =
+        final ListenerRegistration<DataChangeListener> ccapNodeDataChangeListenerRegistration =
                 dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
-                        provider.nodeIID, provider, DataBroker.DataChangeScope.SUBTREE );
+                        provider.ccapsIID, provider, DataBroker.DataChangeScope.SUBTREE );
+
+        final ListenerRegistration<DataChangeListener> serviceFlowsDataChangeListenerRegistration =
+                dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
+                        provider.qosIID, provider, DataBroker.DataChangeScope.SUBTREE );
 
 
         logger.info("PacketCableProvider Registered with DataBroker");

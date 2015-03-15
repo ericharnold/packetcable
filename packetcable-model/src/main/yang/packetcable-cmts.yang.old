@@ -1,0 +1,188 @@
+module packetcable-cmts
+{
+    namespace "urn:opendaylight:node:cmts";
+    prefix "cmts";
+
+    import ietf-yang-types 	{ prefix yang; }
+    import ietf-inet-types 	{ prefix inet; }
+    import opendaylight-l2-types {prefix odl-l2;}
+    import opendaylight-inventory {prefix inv;revision-date "2013-08-19";}
+    import yang-ext {prefix ext; revision-date "2013-07-09";}
+
+    description "This module contains a collection of CMTS definitions";
+    organization "OpenDaylight Project";
+
+    revision 2014-09-09 {
+        description "Initial revision of packetcable cmts";
+    }        
+
+/* ###
+    grouping cmts-node-attributes {
+        description "A PCMM capable CMTS and other available configuration resources.";
+        
+        leaf address {
+            type inet:ip-address;
+            description "IP Address of CMTS";
+        }
+        
+        leaf port {
+            type inet:port-number;
+            description "TCP port number to connect";
+            default 3918;
+        }
+        
+        leaf connected {
+            type boolean;
+            description "CMTS connected state";
+            default false;
+        }
+    }
+        
+    augment "/inv:nodes/inv:node" {
+        ext:augment-identifier "cmts-capable-node";
+        container cmts-node {
+            uses cmts-node-attributes;
+        }
+    }
+    
+    // PCMM flows
+    
+    grouping pcmm-apps {
+        list apps {
+            key "appId";
+		    leaf appId {
+		    	type string;
+		    	description "Application Identity";
+		    }
+            list subs {
+                key "subId";
+			    leaf subId {
+		            type inet:ip-address;
+			    	description "Subscriber Identity";
+			    }
+	            list flows {
+	                key "flowId";
+				    leaf flowId {
+				    	type string;
+				    	description "Flow Identity";
+				    }
+				    uses pcmm-flow-attributes; 
+	            }
+            }
+    	}
+    }
+
+    grouping pcmm-flow-attributes {
+     	uses pcmm-traffic-profile;
+     	uses pcmm-flow-match;
+    }
+    
+    typedef flow-direction {
+	    type enumeration {
+		      enum us {
+		        value "1";
+		        description "Upstream service flow.";
+		      }
+		      enum ds {
+		        value "2";
+		        description "Downstream service flow.";
+		      }
+	  	}
+    	description "This value represents the service flow direction.";
+  	}
+    
+    grouping pcmm-traffic-profile {
+    	container traffic-profile {
+		    leaf service-class-name {
+		        type string;
+		        description "
+			        length 2 to 128 max
+			        The Service Class Name is MUST be 2-128 bytes of null-terminated ASCII string. 
+			        (Refer to section C.2.2.3.4 of [MULPI]).  This name MUST be padded with null bytes 
+			        to align on a 4-byte boundary.
+		        ";
+		    }
+			leaf direction {
+				type flow-direction;
+				description "Service Flow Direction (must match SCN attributes)";
+			}
+		}
+    }
+    
+	 typedef tp-protocol {
+	    type enumeration {
+		      enum tcp_or_udp {
+		        value "256";
+		        description "Either TCP or UDP protocol match.";
+		      }
+		      enum tcp {
+		        value "6";
+		        description "TCP protocol match.";
+		      }
+		      enum udp {
+		        value "17";
+		        description "UDP protocol match.";
+		      }
+	    }
+	    description "This value represents the IP transport protocol (or Next Header).";
+	  }
+  
+      grouping tp-port-match-ranges {
+        container port-match-ranges {
+            leaf tpSrc-start {
+                type inet:port-number;
+                description "Transport source port start.";
+            }
+            leaf tpSrc-end {
+                type inet:port-number;
+                description "Transport source port end.";
+            }
+            leaf tpDst-start {
+                type inet:port-number;
+                description "Transport destination port start.";
+            }
+            leaf tpDst-end {
+                type inet:port-number;
+                description "Transport destination port end.";
+            }
+        }
+    }
+     
+    grouping pcmm-flow-match {
+    	container match {
+	    	leaf nwSrc {
+	    		type inet:ip-prefix;
+	    		description "Source IP prefix match in  <address/len> notation";
+			}
+	    	leaf nwDst {
+	    		type inet:ip-prefix;
+	    		description "Destination IP prefix match in <address/len> notation";
+			}
+	 		leaf nwDscp {
+	 			type inet:dscp;
+	 			description "DSCP match";
+	 		}
+	     	leaf proto {
+	    		type tp-protocol;
+	    		description "IP transport protocol (or Next Header)";
+			}
+	 		leaf tpSrc {
+		        type inet:port-number;
+	    		description "Transport source port (exact match).";
+	   		}    	
+	 		leaf tpDst {
+		        type inet:port-number;
+	    		description "Transport destination port (exact match).";
+	   		}
+	   		uses tp-port-match-ranges; 
+   		}   	
+    }
+    
+    augment "/inv:nodes/inv:node" {
+    	ext:augment-identifier "pcmm-flows";
+    	uses pcmm-apps;
+	}
+### */	
+    
+}
+

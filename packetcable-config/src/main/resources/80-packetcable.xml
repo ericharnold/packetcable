@@ -9,9 +9,6 @@
 <snapshot>
     <required-capabilities>
         <capability>urn:opendaylight:params:xml:ns:yang:packetcable:packetcable-provider:impl?module=packetcable-provider-impl&amp;revision=2014-01-31</capability>
-		<!--
-        <capability>urn:opendaylight:params:xml:ns:yang:packetcable:packetcable-provider?module=packetcable-provider&amp;revision=2014-01-31</capability>
-		-->
     </required-capabilities>
     <configuration>
 

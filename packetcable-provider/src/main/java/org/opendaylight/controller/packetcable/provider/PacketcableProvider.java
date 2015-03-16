@@ -25,46 +25,20 @@ import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
 import org.opendaylight.controller.packetcable.provider.processors.PCMMDataProcessor;
-import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ConsumerContext;
-import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
-import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.RoutedRpcRegistration;
-import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
-import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.Action;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowInput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowOutput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowOutputBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.RemoveFlowInput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.RemoveFlowOutput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.UpdateFlowInput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.UpdateFlowOutput;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.flow.update.OriginalFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.flow.update.UpdatedFlow;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.transaction.rev131103.TransactionId;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.Match;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.ApplyActionsCase;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.list.Instruction;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeContextRef;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeId;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Ccaps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.CcapsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Qos;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.Apps;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.AppsKey;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.apps.Subs;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.apps.SubsKey;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.apps.subs.Dsfs;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.flows.apps.subs.DsfsKey;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.Apps;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.AppsKey;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.Subs;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.SubsKey;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.Gates;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.GatesKey;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration.CompositeObjectRegistrationBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
@@ -97,27 +71,23 @@ import org.pcmm.rcd.impl.PCMMPolicyServer;
 public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private static final Logger logger = LoggerFactory.getLogger(PacketcableProvider.class);
-	private NotificationProviderService notificationProvider;
-	private DataBroker dataProvider;
 
 	private final ExecutorService executor;
 
 	// The following holds the Future for the current make toast task.
 	// This is used to cancel the current toast.
 	private final AtomicReference<Future<?>> currentConnectionsTasks = new AtomicReference<>();
-	private ProviderContext providerContext;
-	private NotificationProviderService notificationService;
-//	private DataBroker dataBroker;
+	private DataBroker dataBroker;
 	private ListenerRegistration<DataChangeListener> listenerRegistration;
 	private List<InstanceIdentifier<?>> cmtsInstances = Lists.newArrayList();
 
 	private Map<String, Ccaps> ccapMap = Maps.newConcurrentMap();
-	private Map<String, Dsfs> flowMap = new ConcurrentHashMap<String, Dsfs>();
+	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
 	private PCMMDataProcessor pcmmDataProcessor;
 	private PcmmService pcmmService;
 
-	public static final InstanceIdentifier<Ccaps>  ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
-	public static final InstanceIdentifier<Qos>  qosIID = InstanceIdentifier.builder(Qos.class).build();
+	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
+	public static final InstanceIdentifier<Qos> qosIID = InstanceIdentifier.builder(Qos.class).build();
 
 	public PacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
@@ -125,12 +95,12 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		pcmmService = new PcmmService();
 	}
 
-	public void setNotificationProvider(final NotificationProviderService salService) {
-		this.notificationProvider = salService;
-	}
+//	public void setNotificationProvider(final NotificationProviderService salService) {
+//		this.notificationProvider = salService;
+//	}
 
-	public void setDataProvider(final DataBroker salDataProvider) {
-		this.dataProvider = salDataProvider;
+	public void setDataBroker(final DataBroker salDataProvider) {
+		this.dataBroker = salDataProvider;
 	}
 
 	/**
@@ -139,9 +109,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	@Override
 	public void close() throws ExecutionException, InterruptedException {
 		executor.shutdown();
-		if (dataProvider != null) {
+		if (dataBroker != null) {
 			for (Iterator<InstanceIdentifier<?>> iter = cmtsInstances.iterator(); iter.hasNext();) {
-				WriteTransaction tx = dataProvider.newWriteOnlyTransaction();
+				WriteTransaction tx = dataBroker.newWriteOnlyTransaction();
 				tx.delete(LogicalDatastoreType.OPERATIONAL, iter.next());
 				Futures.addCallback(tx.submit(), new FutureCallback<Void>() {
 					@Override
@@ -234,11 +204,11 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	 */
 
 	private class InstanceData {
-		public Map<String, String> flowPathMap = new HashMap<String, String>();
-		public String flowPath;
+		public Map<String, String> gatePathMap = new HashMap<String, String>();
+		public String gatePath;
 		public String ccapId;
 		public Ccaps ccap;
-		public List<Dsfs> flowList = new ArrayList<Dsfs>();
+		public List<Gates> gateList = new ArrayList<Gates>();
 		public Set<String> removePathList = new HashSet<String>();
 
 		public InstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
@@ -246,11 +216,11 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			getCcap(thisData);
 			if (ccap != null) {
 				ccapId = ccap.getCcapId();
-				flowPath = ccapId;
+				gatePath = ccapId;
 			} else {
-				getFlows(thisData);
-				if (! flowList.isEmpty()){
-					flowPath = flowPathMap.get("appId") + "/" + flowPathMap.get("subId");
+				getGates(thisData);
+				if (! gateList.isEmpty()){
+					gatePath = gatePathMap.get("appId") + "/" + gatePathMap.get("subId");
 				}
 			}
 		}
@@ -258,34 +228,34 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		public InstanceData(Set<InstanceIdentifier<?>> thisData) {
 			// only used to parse the removedData paths
 			for (InstanceIdentifier<?> removeThis : thisData) {
-				getFlowPathMap(removeThis);
-				if (flowPathMap.containsKey("ccapId")) {
-					flowPath = flowPathMap.get("ccapId");
-					removePathList.add(flowPath);
-				} else if (flowPathMap.containsKey("flowId")) {
-					flowPath = flowPathMap.get("appId") + "/" + flowPathMap.get("subId") + "/" + flowPathMap.get("flowId");
-					removePathList.add(flowPath);
+				getGatePathMap(removeThis);
+				if (gatePathMap.containsKey("ccapId")) {
+					gatePath = gatePathMap.get("ccapId");
+					removePathList.add(gatePath);
+				} else if (gatePathMap.containsKey("gateId")) {
+					gatePath = gatePathMap.get("appId") + "/" + gatePathMap.get("subId") + "/" + gatePathMap.get("gateId");
+					removePathList.add(gatePath);
 				}
 			}
 		}
-		private void getFlowPathMap(InstanceIdentifier<?> thisInstance) {
-			logger.info("onDataChanged().getFlowPathMap(): " + thisInstance);
+		private void getGatePathMap(InstanceIdentifier<?> thisInstance) {
+			logger.debug("onDataChanged().getGatePathMap(): " + thisInstance);
 			try {
 				InstanceIdentifier<Ccaps> ccapInstance = thisInstance.firstIdentifierOf(Ccaps.class);
 				if (ccapInstance != null) {
 					CcapsKey ccapKey = InstanceIdentifier.keyOf(ccapInstance);
 					if (ccapKey != null) {
 						String ccapId = ccapKey.getCcapId();
-						flowPathMap.put("ccapId", ccapId);
+						gatePathMap.put("ccapId", ccapId);
 					}
 				} else {
-					// get the flow path keys from the InstanceIdentifier Map key set if they are there
+					// get the gate path keys from the InstanceIdentifier Map key set if they are there
 					InstanceIdentifier<Apps> appsInstance = thisInstance.firstIdentifierOf(Apps.class);
 					if (appsInstance != null) {
 						AppsKey appKey = InstanceIdentifier.keyOf(appsInstance);
 						if (appKey != null) {
 							String appId = appKey.getAppId();
-							flowPathMap.put("appId", appId);
+							gatePathMap.put("appId", appId);
 						}
 					}
 					InstanceIdentifier<Subs> subsInstance = thisInstance.firstIdentifierOf(Subs.class);
@@ -293,15 +263,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 						SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
 						if (subKey != null) {
 							String subId = getIpAddressStr(subKey.getSubId());
-							flowPathMap.put("subId", subId);
+							gatePathMap.put("subId", subId);
 						}
 					}
-					InstanceIdentifier<Dsfs> flowsInstance = thisInstance.firstIdentifierOf(Dsfs.class);
-					if (flowsInstance != null) {
-						DsfsKey flowKey = InstanceIdentifier.keyOf(flowsInstance);
-						if (flowKey != null) {
-							String flowId = flowKey.getDsfId();
-							flowPathMap.put("flowId", flowId);
+					InstanceIdentifier<Gates> gatesInstance = thisInstance.firstIdentifierOf(Gates.class);
+					if (gatesInstance != null) {
+						GatesKey gateKey = InstanceIdentifier.keyOf(gatesInstance);
+						if (gateKey != null) {
+							String gateId = gateKey.getGateId();
+							gatePathMap.put("gateId", gateId);
 						}
 					}
 				}
@@ -311,7 +281,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 
 		private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
-			logger.info("onDataChanged().getCcap(): " + thisData);
+			logger.debug("onDataChanged().getCcap(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
 				if (entry.getValue() instanceof Ccaps) {
 		            ccap = (Ccaps)entry.getValue();
@@ -319,14 +289,14 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		    }
 		}
 
-		private void getFlows(Map<InstanceIdentifier<?>, DataObject> thisData) {
-			logger.info("onDataChanged().getFlows(): " + thisData);
+		private void getGates(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			logger.debug("onDataChanged().getGates(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-				if (entry.getValue() instanceof Dsfs) {
-					Dsfs flow = (Dsfs)entry.getValue();
+				if (entry.getValue() instanceof Gates) {
+					Gates gate = (Gates)entry.getValue();
 					InstanceIdentifier<?> iid = entry.getKey();
-					getFlowPathMap(iid);
-					flowList.add(flow);
+					getGatePathMap(iid);
+					gateList.add(gate);
 				}
 		    }
 		}
@@ -356,14 +326,14 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		DataObject updatedSubtree = change.getUpdatedSubtree();
 		try {
 			// this will also validate all the values passed in the tree
-			logger.info("onDataChanged().createdData: " + createdData);
-			logger.info("onDataChanged().updatedData: " + updatedData);
-			logger.info("onDataChanged().originalData: " + originalData);
-			logger.info("onDataChanged().removedData: " + removedData);
-			logger.info("onDataChanged().originalSubtree: " + originalSubtree);
-			logger.info("onDataChanged().updatedSubtree: " + updatedSubtree);
+			logger.debug("onDataChanged().createdData: " + createdData);
+			logger.debug("onDataChanged().updatedData: " + updatedData);
+			logger.debug("onDataChanged().originalData: " + originalData);
+			logger.debug("onDataChanged().removedData: " + removedData);
+			logger.debug("onDataChanged().originalSubtree: " + originalSubtree);
+			logger.debug("onDataChanged().updatedSubtree: " + updatedSubtree);
 		} catch (IllegalArgumentException | IllegalStateException err) {
-			logger.warn("onDataChanged().change: Illegal Element Value: " + err);
+			logger.warn("onDataChanged().change: Illegal Element Value in json object: " + err);
 			return;
 		}
 
@@ -389,8 +359,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		String ccapId = null;
 		Ccaps lastCcap = null;
 		Ccaps thisCcap = null;
-		Dsfs lastFlow = null;
-		Dsfs thisFlow = null;
+		Gates lastGate = null;
+		Gates thisGate = null;
 		switch (changeAction) {
 		case created:
 			// get the CMTS parameters from the CmtsNode in the Map entry (if new CMTS)
@@ -398,16 +368,16 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			if (thisCcap != null) {
 				// get the CMTS node identity from the Instance Data
 				ccapId = thisData.ccapId;
-				logger.info("onDataChanged(): created CCAP: " + thisData.flowPath + "/" + thisCcap);
+				logger.info("onDataChanged(): created CCAP: " + thisData.gatePath + "/" + thisCcap);
 				ccapMap.put(ccapId, thisCcap);
 				pcmmService.addCcap(thisCcap);
 			}
-			// get the PCMM flow parameters from the cmtsId/appId/subId/flowId path in the Maps entry (if new flow)
-			for (Dsfs flow : thisData.flowList) {
-				String flowId = flow.getDsfId();
-				String flowPathStr = thisData.flowPath + "/" + flowId ;
-				flowMap.put(flowPathStr, flow);
-				logger.info("onDataChanged(): created serviceFlow: " + flowId + " @ " + flowPathStr + "/" + flow);
+			// get the PCMM gate parameters from the cmtsId/appId/subId/gateId path in the Maps entry (if new gate)
+			for (Gates gate : thisData.gateList) {
+				String gateId = gate.getGateId();
+				String gatePathStr = thisData.gatePath + "/" + gateId ;
+				gateMap.put(gatePathStr, gate);
+				logger.info("onDataChanged(): created QoS gate: " + gateId + " @ " + gatePathStr + "/" + gate);
 			}
 			break;
 		case updated:
@@ -416,32 +386,32 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				// get the CMTS node identity from the Instance Data
 				ccapId = thisData.ccapId;
 				lastCcap = ccapMap.get(ccapId);
-				logger.info("onDataChanged(): updated " + ccapId + ": FROM: " + lastCcap + " TO: " + thisCcap);
+				logger.info("onDataChanged(): updated CCAP " + ccapId + ": FROM: " + lastCcap + " TO: " + thisCcap);
 				ccapMap.put(ccapId, thisCcap);
 				// remove original cmtsNode
 				pcmmService.removeCcap(lastCcap);
 				// and add back the new one
 				pcmmService.addCcap(thisCcap);
 			}
-			for (Dsfs flow : thisData.flowList) {
-				String flowId = flow.getDsfId();
-				String flowPathStr = thisData.flowPath + "/" + flowId ;
-				lastFlow = flowMap.get(flowPathStr);
-				logger.info("onDataChanged(): updated Flow: FROM: " + flowPathStr + "/" + lastFlow + " TO: " + flow);
+			for (Gates gate : thisData.gateList) {
+				String gateId = gate.getGateId();
+				String gatePathStr = thisData.gatePath + "/" + gateId ;
+				lastGate = gateMap.get(gatePathStr);
+				logger.info("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
 			}
 			break;
 		case removed:
-			// remove flows before removing CMTS
-			for (String flowPathStr: thisData.removePathList) {
-				if (flowMap.containsKey(flowPathStr)) {
-					lastFlow = flowMap.remove(flowPathStr);
-					logger.info("onDataChanged(): removed Flow: " + flowPathStr + "/" + lastFlow);
+			// remove gates before removing CMTS
+			for (String gatePathStr: thisData.removePathList) {
+				if (gateMap.containsKey(gatePathStr)) {
+					lastGate = gateMap.remove(gatePathStr);
+					logger.info("onDataChanged(): removed QoS gate: " + gatePathStr + "/" + lastGate);
 				}
 			}
 			for (String ccapIdStr: thisData.removePathList) {
 				if (ccapMap.containsKey(ccapIdStr)) {
 					thisCcap = ccapMap.remove(ccapIdStr);
-					logger.info("onDataChanged(): removed " + ccapIdStr + "/" + thisCcap);
+					logger.info("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
 					ccapMap.remove(ccapIdStr);
 					pcmmService.removeCcap(thisCcap);
 				}
@@ -454,177 +424,5 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-//	@Override
-//	public Collection<? extends RpcService> getImplementations() {
-//		// TODO Auto-generated method stub
-//		return null;
-//	}
-//
-//	@Override
-//	public Collection<? extends ProviderFunctionality> getFunctionality() {
-//		// TODO Auto-generated method stub
-//		return null;
-//	}
-//
-//	@Override
-//	public void onSessionInitiated(ProviderContext session) {
-//		// TODO Auto-generated method stub
-//
-//	}
-//
-//	@Override
-//	public void onSessionInitialized(ConsumerContext session) {
-//		// TODO Auto-generated method stub
-//
-//	}
-//
 
-/* #####
-	public void notifyConsumerOnCmtsAdd(CmtsNode input, TransactionId transactionId) {
-		CmtsAdded cmtsAdded = new CmtsAddedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-		notificationService.publish(cmtsAdded);
-	}
-
-	public void notifyConsumerOnCmtsRemove(CmtsNode input, TransactionId transactionId) {
-		CmtsRemoved cmtsRemoved = new CmtsRemovedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-		notificationService.publish(cmtsRemoved);
-	}
-
-	public void notifyConsumerOnCmtsUpdate(CmtsNode input, TransactionId transactionId) {
-		// Obsolete method: do not use
-//		CmtsUpdated cmtsUpdated = new CmtsUpdatedBuilder().setAddress(input.getAddress()).setPort(input.getPort()).setTransactionId(transactionId).build();
-//		notificationService.publish(cmtsUpdated);
-	}
-
-	@Override
-	public Future<RpcResult<AddFlowOutput>> addFlow(AddFlowInput input) {
-		Match match = input.getMatch();
-		CmtsNode cmts = getCmtsNode(input);
-		if (cmts != null)
-			cmtsInstances.add(input.getNode().getValue());
-		IClassifier classifier = buildClassifier(match);
-		ITrafficProfile trafficProfie = null;
-		for (Instruction i : input.getInstructions().getInstruction()) {
-			if (i.getInstruction() instanceof ApplyActionsCase) {
-				ApplyActionsCase aac = (ApplyActionsCase) i.getInstruction();
-				for (Action a : aac.getApplyActions().getAction()) {
-					if (a.getAction() instanceof FlowspecCase) {
-						// not implemented
-						// trafficProfie = buildTrafficProfile(((FlowspecCase)
-						// a.getAction()).getFlowspec());
-					} else if (a.getAction() instanceof BestEffortCase) {
-						trafficProfie = buildTrafficProfile(((BestEffortCase) a.getAction()).getBestEffort());
-						break;
-					} else if (a.getAction() instanceof DocsisServiceClassNameCase) {
-						trafficProfie = buildTrafficProfile(((DocsisServiceClassNameCase) a.getAction()).getDocsisServiceClassName());
-						break;
-					}
-				}
-			}
-		}
-		TransactionId transactionId = null;
-		notifyConsumerOnCmtsAdd(cmts, transactionId);
-		return Futures.immediateFuture(RpcResultBuilder.success(new AddFlowOutputBuilder().setTransactionId(transactionId).build()).build());
-	}
-
-	@Override
-	public ITrafficProfile buildTrafficProfile(TrafficProfileDocsisServiceClassNameAttributes docsis) {
-		return pcmmDataProcessor.process(docsis);
-	}
-
-	@Override
-	public ITrafficProfile buildTrafficProfile(TrafficProfileBestEffortAttributes bestEffort) {
-		return pcmmDataProcessor.process(bestEffort);
-	}
-
-	@Override
-	public ITrafficProfile buildTrafficProfile(TrafficProfileFlowspecAttributes flowSpec) {
-		return pcmmDataProcessor.process(flowSpec);
-	}
-
-	@Override
-	public IClassifier buildClassifier(Match match) {
-		return pcmmDataProcessor.process(match);
-	}
-
-	@Override
-	public Future<RpcResult<RemoveFlowOutput>> removeFlow(RemoveFlowInput input) {
-		UdpMatchRangesRpcRemoveFlow updRange = input.getMatch().getAugmentation(UdpMatchRangesRpcRemoveFlow.class);
-		notifyConsumerOnCmtsRemove(getCmtsNode(input), null);
-		return null;
-	}
-
-	@Override
-	public Future<RpcResult<UpdateFlowOutput>> updateFlow(UpdateFlowInput input) {
-		OriginalFlow foo = input.getOriginalFlow();
-		UdpMatchRangesRpcUpdateFlowOriginal bar = foo.getMatch().getAugmentation(UdpMatchRangesRpcUpdateFlowOriginal.class);
-		UpdatedFlow updated = input.getUpdatedFlow();
-		UdpMatchRangesRpcUpdateFlowUpdated updatedRange = updated.getMatch().getAugmentation(UdpMatchRangesRpcUpdateFlowUpdated.class);
-		notifyConsumerOnCmtsUpdate(getCmtsNode(input), null);
-		return null;
-	}
-
-	@SuppressWarnings("unchecked")
-	protected CmtsNode getCmtsNode(NodeContextRef input) {
-		NodeRef nodeRef = input.getNode();
-		InstanceIdentifier<Node> instanceIdentifier = (InstanceIdentifier<Node>) nodeRef.getValue();
-		ReadOnlyTransaction rtransaction = dataBroker.newReadOnlyTransaction();
-		CheckedFuture<Optional<Node>, ReadFailedException> value = rtransaction.read(LogicalDatastoreType.CONFIGURATION, instanceIdentifier);
-		rtransaction.close();
-		Optional<Node> opt = null;
-		try {
-			opt = value.get();
-		} catch (Exception e) {
-			logger.error(e.getMessage());
-			return null;
-		}
-		Node node = opt.get();
-		CmtsCapableNode cmts = node.getAugmentation(CmtsCapableNode.class);
-		CmtsNode cmtsNode = cmts.getCmtsNode();
-		return cmtsNode;
-	}
-
-	@Override
-	public Collection<? extends RpcService> getImplementations() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public Collection<? extends ProviderFunctionality> getFunctionality() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public void onSessionInitiated(ProviderContext session) {
-		providerContext = session;
-		notificationService = session.getSALService(NotificationProviderService.class);
-		dataBroker = session.getSALService(DataBroker.class);
-		InstanceIdentifier<CmtsNode> listenTo = InstanceIdentifier.create(Nodes.class).child(Node.class).augmentation(CmtsCapableNode.class).child(CmtsNode.class);
-		listenerRegistration = dataBroker.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION, listenTo, this, DataChangeScope.BASE);
-	}
-
-	@Override
-	public void onSessionInitialized(ConsumerContext session) {
-		// Noop
-
-	}
-*/
-
-//	public void onSessionAdded(/* Whatever you need per CmtsConnection */) {
-//		CompositeObjectRegistrationBuilder<OpendaylightPacketcableProvider> builder = CompositeObjectRegistration.<OpendaylightPacketcableProvider> builderFor(this);
-//		/*
-//		 * You will need a routedRpc registration per Cmts... I'm not doing the
-//		 * accounting of storing them here, but you will need to so you can
-//		 * close them when your provider is closed
-//		 */
-//		RoutedRpcRegistration<SalFlowService> registration = providerContext.addRoutedRpcImplementation(SalFlowService.class, this);
-//		/*
-//		 * You will need to get your identifier somewhere... this is your
-//		 * nodeId. I would recommend adoption a convention like
-//		 * "cmts:<ipaddress>" for CmtsCapableNodes
-//		 * registration.registerPath(NodeContext.class, getIdentifier());
-//		 */
-//	}
 }

@@ -17,8 +17,8 @@
     <repository>mvn:org.opendaylight.openflowplugin/features-openflowplugin/0.0.5-Helium-SR2/xml/features</repository>
     <repository>mvn:org.opendaylight.controller/features-adsal/${feature.adsal.version}/xml/features</repository>	
     <repository>mvn:org.opendaylight.controller/features-adsal-compatibility/1.4.4-Helium-SR2/xml/features</repository>
-    -->
     <repository>mvn:org.opendaylight.controller/features-flow/${mdsal.version}/xml/features</repository>
+    -->
     <repository>mvn:org.opendaylight.yangtools/features-yangtools/0.6.4-Helium-SR2/xml/features</repository>
     <repository>mvn:org.opendaylight.controller/features-mdsal/1.1.2-Helium-SR2/xml/features</repository>
 
@@ -50,7 +50,7 @@
         <feature name='odl-packetcable-model' version='${project.version}' description='OpenDaylight :: packetcable :: Model'>
             <feature version='0.6.4-Helium-SR2'>odl-yangtools-binding</feature>
             <feature version='0.6.4-Helium-SR2'>odl-yangtools-models</feature>
-	    <feature version='${project.version}'>odl-flow-model</feature>
+	    	<!--- <feature version='${project.version}'>odl-flow-model</feature> -->
             <bundle>mvn:org.opendaylight.packetcable/packetcable-model/${project.version}</bundle>
         </feature>
 
@@ -59,7 +59,7 @@
             <feature version='1.1.2-Helium-SR2'>odl-mdsal-broker</feature>
             <bundle>mvn:org.opendaylight.packetcable/packetcable-provider/${project.version}</bundle>
             <bundle>mvn:org.opendaylight.packetcable/packetcable-driver/${project.version}</bundle>
-	        <feature version='${project.version}'>odl-flow-model</feature>
+	        <!--- <feature version='${project.version}'>odl-flow-model</feature> -->
             <feature version='${project.version}'>odl-packetcable-model</feature>
             <feature version='${project.version}'>odl-packetcable-driver</feature>
             <configfile finalname="etc/opendaylight/karaf/80-packetcable.xml">mvn:org.opendaylight.packetcable/packetcable-config/${project.version}/xml/config</configfile>

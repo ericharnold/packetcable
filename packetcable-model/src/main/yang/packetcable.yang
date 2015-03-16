@@ -54,6 +54,10 @@ module packetcable
 	    }
 	    description "This value represents the IP transport protocol (or Next Header).";
 	 }
+	 typedef tos-byte {
+	 	type uint8;
+	 	description "TOS/TC byte or mask";
+	 }
 	 
 	
 	// CCAP devices  
@@ -100,13 +104,13 @@ module packetcable
 		}
 	}
 	
-	// PCMM QoS service flows
+	// PCMM QoS gates
     container qos {
     	description "
-    		PCMM QoS Dynamic Service Flows are organized as a tree by Application/Subscriber/ServiceFlow:
+    		PCMM QoS Gates are organized as a tree by Application/Subscriber/Gate:
     			Each Application is known by its appId which is any string.
     			Each Subscriber is known by its subId which is a CPE IP address in either IPv4 or IPv6 format.
-    			Each ServiceFlow is known by its sfId which is any string.
+    			Each Gate is known by its gateId which is any string.
     		
     		The subscriber's CPE IP address is used to locate the CCAP device that is currently hosting the
     		the Cable Modem that is connected to the subscriber's device. Therefore, it is not necessary
@@ -116,10 +120,10 @@ module packetcable
     		Note that each CCAP entry contains a list of connected subscriber IP subnets as well as a list
     		of all Service Class Names (SCNs) available on the CCAP device. 
     		";
-		uses pcmm-qos-flows;
+		uses pcmm-qos-gates;
     }
     
-    grouping pcmm-qos-flows {
+    grouping pcmm-qos-gates {
         list apps {
             key "appId";
 		    leaf appId {
@@ -132,25 +136,25 @@ module packetcable
 		            type inet:ip-address;
 			    	description "Subscriber Identity";
 			    }
-	            list dsfs {
-	                key "dsfId";
-				    leaf dsfId {
+	            list gates {
+	                key "gateId";
+				    leaf gateId {
 				    	type string;
-				    	description "Dynamic Service Flow Identity";
+				    	description "Qos Gate Identity";
 				    }
-				    uses pcmm-qos-flow-attributes; 
+				    uses pcmm-qos-gate-attributes; 
 	            }
             }
     	}
     }
 
-    grouping pcmm-qos-flow-attributes {
-     	uses pcmm-qos-params;
+    grouping pcmm-qos-gate-attributes {
+     	uses pcmm-qos-traffic-profile;
      	uses pcmm-qos-match;
     }
     
-    grouping pcmm-qos-params {
-    	container qos-params {
+    grouping pcmm-qos-traffic-profile {
+    	container traffic-profile {
 		    leaf service-class-name {
 		    	type service-class-name;
 		    	description "The Service Class Name (SCN). This SCN must be pre-provisioned on the target CCAP";
@@ -193,13 +197,23 @@ module packetcable
 	    		type inet:ip-prefix;
 	    		description "Destination IP prefix match in <address/len> notation";
 			}
-	 		leaf dscp {
-	 			type inet:dscp;
-	 			description "DSCP match";
+	 		leaf tos-byte {
+	 			type tos-byte;
+	 			description "TOS/TC match";
+	 		}
+	 		leaf tos-mask {
+	 			type tos-byte;
+	 			description "TOS/TC mask";
 	 		}
 	     	leaf proto {
 	    		type tp-protocol;
 	    		description "IP transport protocol (or Next Header)";
+			}
+			leaf flow-label {
+				type uint32 {
+					range "0 .. 1048575";
+				}
+				description "IPv6 Flow Label (20 bits)";
 			}
 	 		leaf srcPort {
 		        type inet:port-number;

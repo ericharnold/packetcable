@@ -3,7 +3,7 @@ package org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.packetc
 import org.opendaylight.controller.md.sal.binding.api.DataBroker;
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
-import org.opendaylight.controller.packetcable.provider.OpendaylightPacketcableProvider;
+import org.opendaylight.controller.packetcable.provider.PacketcableProvider;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +26,7 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
 
     @Override
     public java.lang.AutoCloseable createInstance() {
-        OpendaylightPacketcableProvider provider = new OpendaylightPacketcableProvider();
+        PacketcableProvider provider = new PacketcableProvider();
 
         DataBroker dataBrokerService = getDataBrokerDependency();
         provider.setDataProvider(dataBrokerService);

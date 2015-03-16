@@ -7,7 +7,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.M
 import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.ITrafficProfile;
 
-public interface OpenDaylightPacketCableProviderService {
+public interface PacketCableProviderService {
 
 //	public ITrafficProfile buildTrafficProfile(TrafficProfileBestEffortAttributes bestEffort);
 //

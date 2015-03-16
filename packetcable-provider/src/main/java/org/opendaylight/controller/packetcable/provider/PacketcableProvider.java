@@ -94,9 +94,9 @@ import org.pcmm.rcd.impl.PCMMPolicyServer;
 
 
 @SuppressWarnings("unused")
-public class OpendaylightPacketcableProvider implements DataChangeListener, AutoCloseable {
+public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
-	private static final Logger logger = LoggerFactory.getLogger(OpendaylightPacketcableProvider.class);
+	private static final Logger logger = LoggerFactory.getLogger(PacketcableProvider.class);
 	private NotificationProviderService notificationProvider;
 	private DataBroker dataProvider;
 
@@ -119,7 +119,7 @@ public class OpendaylightPacketcableProvider implements DataChangeListener, Auto
 	public static final InstanceIdentifier<Ccaps>  ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
 	public static final InstanceIdentifier<Qos>  qosIID = InstanceIdentifier.builder(Qos.class).build();
 
-	public OpendaylightPacketcableProvider() {
+	public PacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
 		pcmmDataProcessor = new PCMMDataProcessor();
 		pcmmService = new PcmmService();
@@ -269,44 +269,49 @@ public class OpendaylightPacketcableProvider implements DataChangeListener, Auto
 			}
 		}
 		private void getFlowPathMap(InstanceIdentifier<?> thisInstance) {
-			InstanceIdentifier<Ccaps> ccapInstance = thisInstance.firstIdentifierOf(Ccaps.class);
-			if (ccapInstance != null) {
-				CcapsKey ccapKey = InstanceIdentifier.keyOf(ccapInstance);
-				if (ccapKey != null) {
-					String ccapId = ccapKey.getCcapId();
-					flowPathMap.put("ccapId", ccapId);
-				}
-			} else {
-				// get the flow path keys from the InstanceIdentifier Map key set if they are there
-				InstanceIdentifier<Apps> appsInstance = thisInstance.firstIdentifierOf(Apps.class);
-				if (appsInstance != null) {
-					AppsKey appKey = InstanceIdentifier.keyOf(appsInstance);
-					if (appKey != null) {
-						String appId = appKey.getAppId();
-						flowPathMap.put("appId", appId);
+			logger.info("onDataChanged().getFlowPathMap(): " + thisInstance);
+			try {
+				InstanceIdentifier<Ccaps> ccapInstance = thisInstance.firstIdentifierOf(Ccaps.class);
+				if (ccapInstance != null) {
+					CcapsKey ccapKey = InstanceIdentifier.keyOf(ccapInstance);
+					if (ccapKey != null) {
+						String ccapId = ccapKey.getCcapId();
+						flowPathMap.put("ccapId", ccapId);
+					}
+				} else {
+					// get the flow path keys from the InstanceIdentifier Map key set if they are there
+					InstanceIdentifier<Apps> appsInstance = thisInstance.firstIdentifierOf(Apps.class);
+					if (appsInstance != null) {
+						AppsKey appKey = InstanceIdentifier.keyOf(appsInstance);
+						if (appKey != null) {
+							String appId = appKey.getAppId();
+							flowPathMap.put("appId", appId);
+						}
+					}
+					InstanceIdentifier<Subs> subsInstance = thisInstance.firstIdentifierOf(Subs.class);
+					if (subsInstance != null) {
+						SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
+						if (subKey != null) {
+							String subId = getIpAddressStr(subKey.getSubId());
+							flowPathMap.put("subId", subId);
+						}
+					}
+					InstanceIdentifier<Dsfs> flowsInstance = thisInstance.firstIdentifierOf(Dsfs.class);
+					if (flowsInstance != null) {
+						DsfsKey flowKey = InstanceIdentifier.keyOf(flowsInstance);
+						if (flowKey != null) {
+							String flowId = flowKey.getDsfId();
+							flowPathMap.put("flowId", flowId);
+						}
 					}
 				}
-				InstanceIdentifier<Subs> subsInstance = thisInstance.firstIdentifierOf(Subs.class);
-				if (subsInstance != null) {
-					SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
-					if (subKey != null) {
-						String subId = getIpAddressStr(subKey.getSubId());
-						flowPathMap.put("subId", subId);
-					}
-				}
-				InstanceIdentifier<Dsfs> flowsInstance = thisInstance.firstIdentifierOf(Dsfs.class);
-				if (flowsInstance != null) {
-					DsfsKey flowKey = InstanceIdentifier.keyOf(flowsInstance);
-					if (flowKey != null) {
-						String flowId = flowKey.getDsfId();
-						flowPathMap.put("flowId", flowId);
-					}
-				}
-
+			} catch (ClassCastException err) {
+				// do nothing, failure is ok
 			}
 		}
 
 		private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			logger.info("onDataChanged().getCcap(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
 				if (entry.getValue() instanceof Ccaps) {
 		            ccap = (Ccaps)entry.getValue();
@@ -315,27 +320,15 @@ public class OpendaylightPacketcableProvider implements DataChangeListener, Auto
 		}
 
 		private void getFlows(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			logger.info("onDataChanged().getFlows(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-				if (entry.getValue() instanceof Qos) {
-					Qos qos = (Qos)entry.getValue();
-					Apps app = qos.getApps().iterator().next();
-					String appId = app.getAppId();
-					flowPathMap.put("appID", appId);
-					Subs sub = app.getSubs().iterator().next();
-					String subId = getIpAddressStr(sub.getSubId());
-					flowPathMap.put("subId", subId);
-					flowList.addAll(sub.getDsfs());
-		        }
+				if (entry.getValue() instanceof Dsfs) {
+					Dsfs flow = (Dsfs)entry.getValue();
+					InstanceIdentifier<?> iid = entry.getKey();
+					getFlowPathMap(iid);
+					flowList.add(flow);
+				}
 		    }
-//			if (flowList.isEmpty()) {
-//				Dsfs flow = null;
-//				for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
-//					if (entry.getValue() instanceof Dsfs) {
-//			            flow = (Dsfs)entry.getValue();
-//			            flowList.add(flow);
-//			        }
-//			    }
-//			}
 		}
 	}
 
@@ -355,14 +348,28 @@ public class OpendaylightPacketcableProvider implements DataChangeListener, Auto
 
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
-		ChangeAction changeAction = null;
 		Map<InstanceIdentifier<?>, DataObject> createdData = change.getCreatedData();
 		Map<InstanceIdentifier<?>, DataObject> updatedData = change.getUpdatedData();
 		Map<InstanceIdentifier<?>, DataObject> originalData = change.getOriginalData();
 		Set<InstanceIdentifier<?>> removedData = change.getRemovedPaths();
-		InstanceData thisData = null;
+		DataObject originalSubtree = change.getOriginalSubtree();
+		DataObject updatedSubtree = change.getUpdatedSubtree();
+		try {
+			// this will also validate all the values passed in the tree
+			logger.info("onDataChanged().createdData: " + createdData);
+			logger.info("onDataChanged().updatedData: " + updatedData);
+			logger.info("onDataChanged().originalData: " + originalData);
+			logger.info("onDataChanged().removedData: " + removedData);
+			logger.info("onDataChanged().originalSubtree: " + originalSubtree);
+			logger.info("onDataChanged().updatedSubtree: " + updatedSubtree);
+		} catch (IllegalArgumentException | IllegalStateException err) {
+			logger.warn("onDataChanged().change: Illegal Element Value: " + err);
+			return;
+		}
 
 		// Determine what change action took place by looking at the change object's InstanceIdentifier sets
+		ChangeAction changeAction = null;
+		InstanceData thisData = null;
 		if (! createdData.isEmpty()) {
 			changeAction = ChangeAction.created;
 			thisData = new InstanceData(createdData);

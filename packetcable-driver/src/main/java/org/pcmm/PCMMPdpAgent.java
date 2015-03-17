@@ -1,7 +1,7 @@
 /**
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -18,6 +18,7 @@ import java.net.UnknownHostException;
 import org.umu.cops.common.COPSDebug;
 import org.umu.cops.ospep.COPSPepException;
 import org.umu.cops.prpdp.COPSPdpAgent;
+import org.umu.cops.prpdp.COPSPdpConnection;
 import org.umu.cops.prpdp.COPSPdpException;
 import org.umu.cops.stack.COPSAcctTimer;
 import org.umu.cops.stack.COPSClientAcceptMsg;
@@ -315,6 +316,31 @@ public class PCMMPdpAgent extends COPSPdpAgent {
         new Thread(pdpConn).start();
         getConnectionMap().put(pepId.getData().str(), pdpConn);
     }
+
+    /**
+     * Disconnects a PEP
+     * @param pepID PEP-ID of the PEP to be disconnected
+     * @param error COPS Error to be reported as a reason
+     * @throws COPSException
+     * @throws IOException
+     */
+    public void disconnect (String pepID, COPSError error)
+    throws COPSException, IOException {
+
+    	PCMMPdpConnection pdpConn = (PCMMPdpConnection) getConnectionMap().get(pepID);
+
+        COPSHeader cHdr = new COPSHeader(COPSHeader.COPS_OP_CC, getClientType());
+        COPSClientCloseMsg closeMsg = new COPSClientCloseMsg();
+        closeMsg.add(cHdr);
+        if (error != null)
+            closeMsg.add(error);
+
+        closeMsg.writeData(pdpConn.getSocket());
+        pdpConn.close();
+        pdpConn = null;
+    }
+
+
 
     /**
      * @return the _psHost

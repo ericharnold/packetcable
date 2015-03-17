@@ -1,5 +1,6 @@
 package org.opendaylight.controller.packetcable.provider;
 
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -33,6 +34,7 @@ import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Ccaps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.CcapsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Qos;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.Apps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.AppsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.Subs;
@@ -49,10 +51,22 @@ import org.opendaylight.yangtools.yang.binding.KeyedInstanceIdentifier;
 import org.opendaylight.yangtools.yang.binding.RpcService;
 import org.opendaylight.yangtools.yang.common.RpcResult;
 import org.opendaylight.yangtools.yang.common.RpcResultBuilder;
+import org.pcmm.PCMMDef;
+import org.pcmm.PCMMPdpAgent;
+import org.pcmm.PCMMPdpDataProcess;
+import org.pcmm.PCMMPdpMsgSender;
 import org.pcmm.gates.IClassifier;
+import org.pcmm.gates.IGateID;
+import org.pcmm.gates.IGateSpec;
+import org.pcmm.gates.IPCMMGate;
 import org.pcmm.gates.ITrafficProfile;
+import org.pcmm.gates.impl.GateID;
+import org.pcmm.gates.impl.PCMMGateReq;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.umu.cops.prpdp.COPSPdpException;
+import org.umu.cops.stack.COPSError;
+import org.umu.cops.stack.COPSException;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
@@ -83,7 +97,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private Map<String, Ccaps> ccapMap = Maps.newConcurrentMap();
 	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
-	private PCMMDataProcessor pcmmDataProcessor;
+	private PCMMDataProcessor gateBuilder;
 	private PcmmService pcmmService;
 
 	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
@@ -91,7 +105,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	public PacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
-		pcmmDataProcessor = new PCMMDataProcessor();
+		gateBuilder = new PCMMDataProcessor();
 		pcmmService = new PcmmService();
 	}
 
@@ -132,54 +146,134 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	 * PCMM services -- locally implemented from packetcable-consumer.PcmmServiceImpl.java
 	 * sync call only, no notification required
 	 */
+	private class CcapClient {
+		protected PCMMPdpDataProcess pcmmProcess;
+	    protected PCMMPdpAgent pcmmPdp;
+	    protected PCMMPdpMsgSender pcmmSender;
+	    String ipv4 = null;
+	    Integer port = PCMMPdpAgent.WELL_KNOWN_PDP_PORT;
+	    Boolean isConnected = false;
+
+    	public CcapClient() {
+			pcmmPdp = new PCMMPdpAgent(PCMMDef.C_PCMM, pcmmProcess);
+    	}
+
+        public void connect(IpAddress ccapIp, PortNumber portNum ) {
+        	ipv4 = ccapIp.getIpv4Address().getValue();
+        	if (portNum != null) {
+        		port = portNum.getValue();
+        	}
+            logger.info("CcapClient: connect(): {}:{}", ipv4, port);
+            try  {
+                pcmmPdp.connect(ipv4, port);
+                isConnected = true;
+            } catch (Exception e) {
+                logger.error("CcapClient: connect(): {}:{} FAILED: {}", ipv4, port, e.getMessage());
+            }
+        }
+
+        public void disconnect() {
+            logger.info("CcapClient: disconnect(): {}:{}", ipv4, port);
+        	try {
+				pcmmPdp.disconnect(pcmmPdp.getPepIdString(), null);
+				isConnected = false;
+			} catch (COPSException | IOException e) {
+                logger.error("CcapClient: disconnect(): {}:{} FAILED: {}", ipv4, port, e.getMessage());
+			}
+        }
+
+        public Boolean sendGateSet(PCMMGateReq gateReq) {
+            logger.info("CcapClient: sendGateSet(): {}:{} => {}", ipv4, port, gateReq);
+        	try {
+                pcmmSender = new PCMMPdpMsgSender(PCMMDef.C_PCMM, pcmmPdp.getClientHandle(), pcmmPdp.getSocket());
+				pcmmSender.sendGateSet(gateReq);
+			} catch (COPSPdpException e) {
+                logger.error("CcapClient: sendGateSet(): {}:{} => {} FAILED: {}", ipv4, port, gateReq, e.getMessage());
+			}
+        	while (pcmmSender.getGateID() == null) {
+        		// wait for pcmmSender.handleGateReport(socket) to come back with gateID
+        		try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					break;
+				}
+        	}
+        	// and save it back to the gateRequest object for gate delete later
+    		gateReq.setGateID(pcmmSender.getGateID());
+			return true;
+        }
+
+        public Boolean sendGateDelete(IGateID gateId) {
+        	try {
+                pcmmSender = new PCMMPdpMsgSender(PCMMDef.C_PCMM, pcmmPdp.getClientHandle(), pcmmPdp.getSocket());
+				pcmmSender.sendGateDelete(gateId.getGateID());
+			} catch (COPSPdpException e) {
+                logger.error("CcapClient: sendGateDelete(): {}:{} => {} FAILED: {}", ipv4, port, gateId, e.getMessage());
+			}
+
+			return true;
+
+        }
+
+	}
 
 	private class PcmmService {
-		private Map<IpAddress, IPSCMTSClient> ccapClients;
-		private IPCMMPolicyServer policyServer;
+		private Map<IpAddress, CcapClient> ccapClients = Maps.newConcurrentMap();
+		private Map<String, PCMMGateReq> gateRequests = Maps.newConcurrentMap();
 
 		public PcmmService() {
-			policyServer = new PCMMPolicyServer();
-			ccapClients = Maps.newConcurrentMap();
 		}
 
 		public void addCcap(Ccaps ccap) {
-			IpAddress ipAddr = ccap.getNetwork().getIpAddress();
+			IpAddress ipAddr = ccap.getConnection().getIpAddress();
+			PortNumber port = ccap.getConnection().getPort();
 			String ipv4 = ipAddr.getIpv4Address().getValue();
 			logger.info("addCcap(): " + ipv4);
-			IPSCMTSClient client = policyServer.requestCMTSConnection(ipv4);
-			if (client.isConnected()) {
+			CcapClient client = new CcapClient();
+			client.connect(ipAddr, port);
+			if (client.isConnected) {
 				ccapClients.put(ipAddr, client);
 				logger.info("addCcap(): connected:" + ipv4);
 			}
 		}
 
 		public void removeCcap(Ccaps ccap) {
-			IpAddress ipAddr = ccap.getNetwork().getIpAddress();
+			IpAddress ipAddr = ccap.getConnection().getIpAddress();
 			String ipv4 = ipAddr.getIpv4Address().getValue();
 			logger.info("removeCcap(): " + ipv4);
 			if (ccapClients.containsKey(ipAddr)) {
-				IPSCMTSClient client = ccapClients.remove(ipAddr);
+				CcapClient client = ccapClients.remove(ipAddr);
 				client.disconnect();
 				logger.info("removeCcap(): disconnected: " + ipv4);
 			}
 		}
 
-		public Boolean sendGateSet() {
-			// TODO change me
-			boolean ret = true;
-			for (Iterator<IPSCMTSClient> iter = ccapClients.values().iterator(); iter.hasNext();)
-				ret &= ccapClients.get(0).gateSet();
+		public Boolean sendGateSet(String gatePathStr, Gates qosGate) {
+			//TODO: find the matching CCAP for this subId
+			CcapClient ccap = ccapClients.values().iterator().next();
+			// build the gate request
+			PCMMGateReq gateReq = new PCMMGateReq();
+			IGateSpec gateSpec = gateBuilder.build(qosGate.getGateSpec());
+			gateReq.setGateSpec(gateSpec);
+			ITrafficProfile trafficProfile = gateBuilder.build(qosGate.getTrafficProfile());
+			gateReq.setTrafficProfile(trafficProfile);
+			IClassifier classifier = gateBuilder.build(qosGate.getClassifier());
+			gateReq.setClassifier(classifier);
+			// send it to the CCAP
+			boolean ret = ccap.sendGateSet(gateReq);
+			// and remember it
+			gateRequests.put(gatePathStr, gateReq);
 			return ret;
 		}
 
-		public Boolean sendGateDelete() {
-			// TODO change me
-			boolean ret = true;
-			for (Iterator<IPSCMTSClient> iter = ccapClients.values().iterator(); iter.hasNext();)
-				ret &= ccapClients.get(0).gateDelete();
+		public Boolean sendGateDelete(String gatePathStr) {
+			//TODO: find the matching CCAP for this subId
+			CcapClient ccap = ccapClients.values().iterator().next();
+			PCMMGateReq gateReq = gateRequests.remove(gatePathStr);
+			Boolean ret = ccap.sendGateDelete(gateReq.getGateID());
 			return ret;
 		}
-
+/*
 		public Boolean sendGateSynchronize() {
 			// TODO change me
 			boolean ret = true;
@@ -195,7 +289,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				ret &= ccapClients.get(0).gateInfo();
 			return ret;
 		}
-
+*/
 	}
 
 
@@ -377,6 +471,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				String gateId = gate.getGateId();
 				String gatePathStr = thisData.gatePath + "/" + gateId ;
 				gateMap.put(gatePathStr, gate);
+				pcmmService.sendGateSet(gatePathStr, gate);
 				logger.info("onDataChanged(): created QoS gate: " + gateId + " @ " + gatePathStr + "/" + gate);
 			}
 			break;
@@ -405,6 +500,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			for (String gatePathStr: thisData.removePathList) {
 				if (gateMap.containsKey(gatePathStr)) {
 					lastGate = gateMap.remove(gatePathStr);
+					pcmmService.sendGateDelete(gatePathStr);
 					logger.info("onDataChanged(): removed QoS gate: " + gatePathStr + "/" + lastGate);
 				}
 			}

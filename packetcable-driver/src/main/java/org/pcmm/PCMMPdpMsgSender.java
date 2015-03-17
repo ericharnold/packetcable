@@ -1,7 +1,7 @@
 /**
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -89,8 +89,9 @@ public class PCMMPdpMsgSender {
      */
     protected short _transactionID;
     protected short _classifierID;
-    // XXX - this does not need to be here
-    protected int _gateID;
+
+    // Need this to delete the gate
+    protected IGateID _gateID = null;
 
     /**
      * Creates a PCMMPdpMsgSender
@@ -148,6 +149,15 @@ public class PCMMPdpMsgSender {
      */
     public short getTransactionID() {
         return _transactionID;
+    }
+
+    /**
+     * Gets the gate-id
+     *
+     * @return the gate-id value
+     */
+    public IGateID getGateID() {
+        return _gateID;
     }
 
 
@@ -633,7 +643,7 @@ public class PCMMPdpMsgSender {
                     System.out.println("the CMTS has sent a Gate-Set-Ack response");
                     // here CMTS responded that he acknowledged the Gate-Set
                     // TODO do further check of Gate-Set-Ack GateID etc...
-                    _gateID = responseGate.getGateID().getGateID();
+                    _gateID = responseGate.getGateID();
                     return true;
                 } else {
                     return false;

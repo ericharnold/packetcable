@@ -6,28 +6,28 @@ package org.opendaylight.controller.packetcable.provider.processors;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpPrefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileBestEffortAttributes;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileDocsisServiceClassNameAttributes;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.TrafficProfileFlowspecAttributes;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeAuthorizedEnvelope;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeCommittedEnvelope;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.traffic.profile.rev140908.traffic.profile.best.effort.attributes.BeReservedEnvelope;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.Match;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.SubscriberIdRpcAddFlow;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesAttributes;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.TcpMatchRangesRpcAddFlow;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesAttributes;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.UdpMatchRangesRpcAddFlow;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.tcp.match.ranges.attributes.TcpMatchRanges;
-//import org.opendaylight.yang.gen.v1.urn.opendaylight.packetcable.match.types.rev140909.udp.match.ranges.attributes.UdpMatchRanges;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TpProtocol;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gate.spec.GateSpec;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.profile.TrafficProfile;
+import org.pcmm.PCMMPdpAgent;
+import org.pcmm.PCMMPdpDataProcess;
+import org.pcmm.PCMMPdpMsgSender;
 import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IExtendedClassifier;
+import org.pcmm.gates.IGateSpec;
+import org.pcmm.gates.IGateSpec.Direction;
 import org.pcmm.gates.ITrafficProfile;
-import org.pcmm.gates.impl.BestEffortService;
-import org.pcmm.gates.impl.BestEffortService.BEEnvelop;
+//import org.pcmm.gates.impl.BestEffortService;
+//import org.pcmm.gates.impl.BestEffortService.BEEnvelop;
 import org.pcmm.gates.impl.DOCSISServiceClassNameTrafficProfile;
 import org.pcmm.gates.impl.ExtendedClassifier;
 import org.slf4j.Logger;
@@ -41,7 +41,131 @@ import org.slf4j.LoggerFactory;
 public class PCMMDataProcessor {
 
 	private Logger logger = LoggerFactory.getLogger(PCMMDataProcessor.class);
+
+	public IGateSpec build(GateSpec qosGateSpec) {
+		IGateSpec gateSpec = new org.pcmm.gates.impl.GateSpec();
+		if (qosGateSpec.getDirection() != null) {
+			ServiceFlowDirection qosDir = qosGateSpec.getDirection();
+			Direction dir = null;
+			if (qosDir == qosDir.Ds) {
+				dir = Direction.DOWNSTREAM;
+			} else if (qosDir == qosDir.Us) {
+				dir = Direction.UPSTREAM;
+			}
+			gateSpec.setDirection(dir);
+		}
+		return gateSpec;
+	}
+
+	public ITrafficProfile build(TrafficProfile qosTrafficProfile) {
+		DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
+		if (qosTrafficProfile.getServiceClassName() != null) {
+			trafficProfile.setServiceClassName(qosTrafficProfile.getServiceClassName().getValue());
+		}
+		return trafficProfile;
+	}
+
+	private InetAddress getByName(Ipv4Address ipv4){
+		InetAddress ipAddress = null;
+		try {
+			ipAddress = InetAddress.getByName(ipv4.getValue());
+		} catch (UnknownHostException e) {
+			logger.error(e.getMessage());
+		}
+		return ipAddress;
+	}
+
+	public IClassifier build(Classifier qosClassifier) {
+		// Legacy classifier
+		IClassifier classifier = new org.pcmm.gates.impl.Classifier();
+		if (qosClassifier.getProtocol() == TpProtocol.Tcp){
+			classifier.setProtocol(IClassifier.Protocol.TCP);
+		} else if (qosClassifier.getProtocol() == TpProtocol.Udp){
+			classifier.setProtocol(IClassifier.Protocol.UDP);
+		} else {
+			classifier.setProtocol(IClassifier.Protocol.NONE);
+		}
+		if (qosClassifier.getSrcIp() != null) {
+			InetAddress sip = getByName(qosClassifier.getSrcIp());
+			if (sip != null) {
+				classifier.setSourceIPAddress(sip);
+			}
+		}
+		if (qosClassifier.getDstIp() != null) {
+			InetAddress dip = getByName(qosClassifier.getDstIp());
+			if (dip != null) {
+				classifier.setDestinationIPAddress(dip);
+			}
+		}
+		if (qosClassifier.getSrcPort() != null) {
+			classifier.setSourcePort(qosClassifier.getSrcPort().getValue().shortValue());
+		}
+		if (qosClassifier.getDstPort() != null) {
+			classifier.setDestinationPort(qosClassifier.getDstPort().getValue().shortValue());
+		}
+		if (qosClassifier.getTosByte() != null) {
+			classifier.setDSCPTOS(qosClassifier.getTosByte().getValue().byteValue());
+			if (qosClassifier.getTosMask() != null) {
+				classifier.setDSCPTOSMask(qosClassifier.getTosMask().getValue().byteValue());
+			} else {
+				// set default TOS mask
+				classifier.setDSCPTOSMask((byte)0xff);
+			}
+		}
+		return classifier;
+	}
 /*
+	private void getTcpMatchRangesValues(TcpMatchRangesAttributes tcpRange, IExtendedClassifier classifier) {
+		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
+		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
+		if (tcpRange != null) {
+			classifier.setProtocol(IClassifier.Protocol.TCP);
+			TcpMatchRanges tcpMatchRanges = tcpRange.getTcpMatchRanges();
+			PortNumber tcpDestinationPortStart = tcpMatchRanges.getTcpDestinationPortStart();
+			if (tcpDestinationPortStart != null && tcpDestinationPortStart.getValue() != null)
+				dstPortStart = tcpDestinationPortStart.getValue().shortValue();
+			PortNumber tcpSourcePortStart = tcpMatchRanges.getTcpSourcePortStart();
+			if (tcpSourcePortStart != null && tcpSourcePortStart.getValue() != null)
+				srcPortStart = tcpSourcePortStart.getValue().shortValue();
+			PortNumber tcpDestinationPortEnd = tcpMatchRanges.getTcpDestinationPortEnd();
+			if (tcpDestinationPortEnd != null && tcpDestinationPortEnd.getValue() != null)
+				dstPortEnd = tcpDestinationPortEnd.getValue().shortValue();
+			PortNumber tcpSourcePortEnd = tcpMatchRanges.getTcpSourcePortEnd();
+			if (tcpSourcePortEnd != null && tcpSourcePortEnd.getValue() != null)
+				srcPortEnd = tcpSourcePortEnd.getValue().shortValue();
+		}
+		classifier.setDestinationPortStart(dstPortStart);
+		classifier.setSourcePortStart(srcPortStart);
+		classifier.setDestinationPortEnd(dstPortEnd);
+		classifier.setSourcePortEnd(srcPortEnd);
+	}
+
+	private void getUdpMatchRangeValues(UdpMatchRangesAttributes udpRange, IExtendedClassifier classifier) {
+		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
+		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
+		if (udpRange != null) {
+			classifier.setProtocol(IClassifier.Protocol.UDP);
+			UdpMatchRanges udpMatchRanges = udpRange.getUdpMatchRanges();
+			PortNumber udpDestinationPortStart = udpMatchRanges.getUdpDestinationPortStart();
+			if (udpDestinationPortStart != null && udpDestinationPortStart.getValue() != null)
+				dstPortStart = udpDestinationPortStart.getValue().shortValue();
+			PortNumber udpSourcePortStart = udpMatchRanges.getUdpSourcePortStart();
+			if (udpSourcePortStart != null && udpSourcePortStart.getValue() != null)
+				srcPortStart = udpSourcePortStart.getValue().shortValue();
+			PortNumber udpDestinationPortEnd = udpMatchRanges.getUdpDestinationPortEnd();
+			if (udpDestinationPortEnd != null && udpDestinationPortEnd.getValue() != null)
+				dstPortEnd = udpDestinationPortEnd.getValue().shortValue();
+			PortNumber udpSourcePortEnd = udpMatchRanges.getUdpSourcePortEnd();
+			if (udpSourcePortEnd != null && udpSourcePortEnd.getValue() != null)
+				srcPortEnd = udpSourcePortEnd.getValue().shortValue();
+		}
+		classifier.setDestinationPortStart(dstPortStart);
+		classifier.setSourcePortStart(srcPortStart);
+		classifier.setDestinationPortEnd(dstPortEnd);
+		classifier.setSourcePortEnd(srcPortEnd);
+	}
+
+	/*
 	public ITrafficProfile process(TrafficProfileBestEffortAttributes bestEffort) {
 		BestEffortService trafficProfile = new BestEffortService(BestEffortService.DEFAULT_ENVELOP);
 		getBEAuthorizedEnvelop(bestEffort, trafficProfile);

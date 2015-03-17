@@ -77,10 +77,11 @@ module packetcable
   
 	grouping ccap-attributes {
 		description "
-			Each CCAP device has a network address, a list of subscriber IP subnets,
-			a list of available Service Class Names, and a COPS connection state.
+			Each CCAP device has a COPS connection address, port, and state,
+			a list of subscriber IP subnets, and
+			a list of available Service Class Names.
 			";
-		container network {
+		container connection {
 			leaf ipAddress {
 	        	type inet:ip-address;
 	        	description "IP Address of CCAP";
@@ -149,8 +150,20 @@ module packetcable
     }
 
     grouping pcmm-qos-gate-attributes {
+     	uses pcmm-qos-gate-spec;
      	uses pcmm-qos-traffic-profile;
-     	uses pcmm-qos-match;
+  		uses pcmm-qos-classifier;
+ 		uses pcmm-qos-ext-classifier;
+ 		uses pcmm-qos-ipv6-classifier;
+    }
+    
+    grouping pcmm-qos-gate-spec {
+    	container gate-spec {
+			leaf direction {
+				type service-flow-direction;
+				description "Gate Direction (must match SCN dir attribute)";
+			}
+		}
     }
     
     grouping pcmm-qos-traffic-profile {
@@ -159,61 +172,49 @@ module packetcable
 		    	type service-class-name;
 		    	description "The Service Class Name (SCN). This SCN must be pre-provisioned on the target CCAP";
 		    }
-			leaf direction {
-				type service-flow-direction;
-				description "Service Flow Direction (must match SCN dir attribute)";
-			}
 		}
     }
     
-     grouping tp-port-match-ranges {
-        container port-match-ranges {
-            leaf srcPort-begin {
-                type inet:port-number;
-                description "TCP/UDP source port range begin.";
-            }
-            leaf srcPort-end {
-                type inet:port-number;
-                description "TCP/UDP source port range end.";
-            }
-            leaf dstPort-begin {
-                type inet:port-number;
-                description "TCP/UDP destination port range begin.";
-            }
-            leaf dstPort-end {
-                type inet:port-number;
-                description "TCP/UDP destination port range end.";
-            }
+    grouping tp-port-match-ranges {
+        leaf srcPort-begin {
+            type inet:port-number;
+            description "TCP/UDP source port range begin.";
+        }
+        leaf srcPort-end {
+            type inet:port-number;
+            description "TCP/UDP source port range end.";
+        }
+        leaf dstPort-begin {
+            type inet:port-number;
+            description "TCP/UDP destination port range begin.";
+        }
+        leaf dstPort-end {
+            type inet:port-number;
+            description "TCP/UDP destination port range end.";
         }
     }
-     
-    grouping pcmm-qos-match {
-    	container match {
+
+    grouping pcmm-qos-classifier {
+    	container classifier {
 	    	leaf srcIp {
-	    		type inet:ip-prefix;
-	    		description "Source IP prefix match in  <address/len> notation";
+	    		type inet:ipv4-address;
+	    		description "Source IPv4 address (exact match)";
 			}
 	    	leaf dstIp {
-	    		type inet:ip-prefix;
-	    		description "Destination IP prefix match in <address/len> notation";
+	    		type inet:ipv4-address;
+	    		description "Destination IPv4 address (exact match)";
 			}
 	 		leaf tos-byte {
 	 			type tos-byte;
-	 			description "TOS/TC match";
+	 			description "TOS/DSCP match";
 	 		}
 	 		leaf tos-mask {
 	 			type tos-byte;
-	 			description "TOS/TC mask";
+	 			description "TOS/DSCP mask";
 	 		}
-	     	leaf proto {
+	     	leaf protocol {
 	    		type tp-protocol;
-	    		description "IP transport protocol (or Next Header)";
-			}
-			leaf flow-label {
-				type uint32 {
-					range "0 .. 1048575";
-				}
-				description "IPv6 Flow Label (20 bits)";
+	    		description "IPv4 transport protocol";
 			}
 	 		leaf srcPort {
 		        type inet:port-number;
@@ -223,6 +224,67 @@ module packetcable
 		        type inet:port-number;
 	    		description "TCP/UDP destination port (exact match).";
 	   		}
+   		}   	
+    }    
+
+    grouping pcmm-qos-ext-classifier {
+    	container ext-classifier {
+	    	leaf srcIp {
+	    		type inet:ipv4-prefix;
+	    		description "Source IPv4 prefix match in  <address/len> notation";
+			}
+	    	leaf dstIp {
+	    		type inet:ipv4-prefix;
+	    		description "Destination IPv4 prefix match in <address/len> notation";
+			}
+	 		leaf tos-byte {
+	 			type tos-byte;
+	 			description "TOS/DSCP match";
+	 		}
+	 		leaf tos-mask {
+	 			type tos-byte;
+	 			description "TOS/DSCP mask";
+	 		}
+	     	leaf protocol {
+	    		type tp-protocol;
+	    		description "IPv4 transport protocol";
+			}
+			uses tp-port-match-ranges;
+   		}   	
+    }    
+
+    grouping pcmm-qos-ipv6-classifier {
+    	container ipv6-classifier {
+	    	leaf srcIp6 {
+	    		type inet:ipv6-prefix;
+	    		description "Source IPv6 prefix match in  <address/len> notation";
+			}
+	    	leaf dstIp6 {
+	    		type inet:ipv6-prefix;
+	    		description "Destination IPv6 prefix match in <address/len> notation";
+			}
+	 		leaf tc-low {
+	 			type tos-byte;
+	 			description "TC low range match";
+	 		}
+	 		leaf tc-high {
+	 			type tos-byte;
+	 			description "TC high range match";
+	 		}
+	 		leaf tc-mask {
+	 			type tos-byte;
+	 			description "TC mask";
+	 		}
+	     	leaf next-hdr {
+	    		type tp-protocol;
+	    		description "IPv6 Next Header";
+			}
+			leaf flow-label {
+				type uint32 {
+					range "0 .. 1048575";
+				}
+				description "IPv6 Flow Label (20 bits)";
+			}
 	   		uses tp-port-match-ranges; 
    		}   	
     }    

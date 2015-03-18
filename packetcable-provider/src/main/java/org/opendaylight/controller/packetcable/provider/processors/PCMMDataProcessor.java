@@ -21,15 +21,20 @@ import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.p
 import org.pcmm.PCMMPdpAgent;
 import org.pcmm.PCMMPdpDataProcess;
 import org.pcmm.PCMMPdpMsgSender;
+import org.pcmm.gates.IAMID;
 import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.IGateSpec;
+import org.pcmm.gates.ISubscriberID;
 import org.pcmm.gates.IGateSpec.Direction;
 import org.pcmm.gates.ITrafficProfile;
+import org.pcmm.gates.impl.AMID;
 //import org.pcmm.gates.impl.BestEffortService;
 //import org.pcmm.gates.impl.BestEffortService.BEEnvelop;
 import org.pcmm.gates.impl.DOCSISServiceClassNameTrafficProfile;
 import org.pcmm.gates.impl.ExtendedClassifier;
+import org.pcmm.gates.impl.PCMMGateReq;
+import org.pcmm.gates.impl.SubscriberID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +47,37 @@ public class PCMMDataProcessor {
 
 	private Logger logger = LoggerFactory.getLogger(PCMMDataProcessor.class);
 
-	public IGateSpec build(GateSpec qosGateSpec) {
+	private PCMMGateReq gateReq = new org.pcmm.gates.impl.PCMMGateReq();
+
+	public PCMMDataProcessor() {
+		gateReq = new org.pcmm.gates.impl.PCMMGateReq();
+		gateReq.setAMID(setAmId(1, 1));
+	}
+
+	public PCMMGateReq getGateReq() {
+		return gateReq;
+	}
+
+	private IAMID setAmId(int amType, int amTag){
+		IAMID amid = new org.pcmm.gates.impl.AMID();
+        amid.setApplicationType((short)amType);
+        amid.setApplicationMgrTag((short)amTag);
+        return amid;
+	}
+
+	public void build(String qosSubId){
+		ISubscriberID subId = new SubscriberID();
+		InetAddress inetAddr = null;
+		try {
+			inetAddr = InetAddress.getByName(qosSubId);
+		} catch (UnknownHostException e) {
+			logger.error("sendGateSet(): Invalid SubId: " + e);
+		}
+		subId.setSourceIPAddress(inetAddr);
+		gateReq.setSubscriberID(subId);
+	}
+
+	public void build(GateSpec qosGateSpec) {
 		IGateSpec gateSpec = new org.pcmm.gates.impl.GateSpec();
 		if (qosGateSpec.getDirection() != null) {
 			ServiceFlowDirection qosDir = qosGateSpec.getDirection();
@@ -54,15 +89,15 @@ public class PCMMDataProcessor {
 			}
 			gateSpec.setDirection(dir);
 		}
-		return gateSpec;
+		gateReq.setGateSpec(gateSpec);
 	}
 
-	public ITrafficProfile build(TrafficProfile qosTrafficProfile) {
+	public void build(TrafficProfile qosTrafficProfile) {
 		DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
 		if (qosTrafficProfile.getServiceClassName() != null) {
 			trafficProfile.setServiceClassName(qosTrafficProfile.getServiceClassName().getValue());
 		}
-		return trafficProfile;
+		gateReq.setTrafficProfile(trafficProfile);
 	}
 
 	private InetAddress getByName(Ipv4Address ipv4){
@@ -75,9 +110,10 @@ public class PCMMDataProcessor {
 		return ipAddress;
 	}
 
-	public IClassifier build(Classifier qosClassifier) {
+	public void build(Classifier qosClassifier) {
 		// Legacy classifier
 		IClassifier classifier = new org.pcmm.gates.impl.Classifier();
+		classifier.setPriority((byte) 64);
 		if (qosClassifier.getProtocol() == TpProtocol.Tcp){
 			classifier.setProtocol(IClassifier.Protocol.TCP);
 		} else if (qosClassifier.getProtocol() == TpProtocol.Udp){
@@ -112,7 +148,7 @@ public class PCMMDataProcessor {
 				classifier.setDSCPTOSMask((byte)0xff);
 			}
 		}
-		return classifier;
+		gateReq.setClassifier(classifier);
 	}
 /*
 	private void getTcpMatchRangesValues(TcpMatchRangesAttributes tcpRange, IExtendedClassifier classifier) {

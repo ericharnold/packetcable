@@ -2,6 +2,8 @@ package org.opendaylight.controller.packetcable.provider;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,9 +61,11 @@ import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IGateID;
 import org.pcmm.gates.IGateSpec;
 import org.pcmm.gates.IPCMMGate;
+import org.pcmm.gates.ISubscriberID;
 import org.pcmm.gates.ITrafficProfile;
 import org.pcmm.gates.impl.GateID;
 import org.pcmm.gates.impl.PCMMGateReq;
+import org.pcmm.gates.impl.SubscriberID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.umu.cops.prpdp.COPSPdpException;
@@ -97,7 +101,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private Map<String, Ccaps> ccapMap = Maps.newConcurrentMap();
 	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
-	private PCMMDataProcessor gateBuilder;
 	private PcmmService pcmmService;
 
 	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
@@ -105,7 +108,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	public PacketcableProvider() {
 		executor = Executors.newCachedThreadPool();
-		gateBuilder = new PCMMDataProcessor();
 		pcmmService = new PcmmService();
 	}
 
@@ -190,13 +192,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			} catch (COPSPdpException e) {
                 logger.error("CcapClient: sendGateSet(): {}:{} => {} FAILED: {}", ipv4, port, gateReq, e.getMessage());
 			}
-        	while (pcmmSender.getGateID() == null) {
-        		// wait for pcmmSender.handleGateReport(socket) to come back with gateID
+        	int count = 3;
+        	while (count > 0 && pcmmSender.getGateID() == null) {
+        		// wait up to 3 seconds for pcmmSender.handleGateReport(socket) to come back with gateID
         		try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
 					break;
 				}
+        		count--;
         	}
         	// and save it back to the gateRequest object for gate delete later
     		gateReq.setGateID(pcmmSender.getGateID());
@@ -248,18 +252,17 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 		}
 
-		public Boolean sendGateSet(String gatePathStr, Gates qosGate) {
+		public Boolean sendGateSet(String gatePathStr, IpAddress qosSubId, Gates qosGate) {
 			//TODO: find the matching CCAP for this subId
 			CcapClient ccap = ccapClients.values().iterator().next();
-			// build the gate request
-			PCMMGateReq gateReq = new PCMMGateReq();
-			IGateSpec gateSpec = gateBuilder.build(qosGate.getGateSpec());
-			gateReq.setGateSpec(gateSpec);
-			ITrafficProfile trafficProfile = gateBuilder.build(qosGate.getTrafficProfile());
-			gateReq.setTrafficProfile(trafficProfile);
-			IClassifier classifier = gateBuilder.build(qosGate.getClassifier());
-			gateReq.setClassifier(classifier);
+			// build the gate request for this subId
+			PCMMDataProcessor gateBuilder = new PCMMDataProcessor();
+			gateBuilder.build(getIpAddressStr(qosSubId));
+			gateBuilder.build(qosGate.getGateSpec());
+			gateBuilder.build(qosGate.getTrafficProfile());
+			gateBuilder.build(qosGate.getClassifier());
 			// send it to the CCAP
+			PCMMGateReq gateReq = gateBuilder.getGateReq();
 			boolean ret = ccap.sendGateSet(gateReq);
 			// and remember it
 			gateRequests.put(gatePathStr, gateReq);
@@ -298,11 +301,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	 */
 
 	private class InstanceData {
+		// CCAP Identity
+		public Ccaps ccap;
+		public String ccapId;
+		// Gate Identity
 		public Map<String, String> gatePathMap = new HashMap<String, String>();
 		public String gatePath;
-		public String ccapId;
-		public Ccaps ccap;
 		public List<Gates> gateList = new ArrayList<Gates>();
+		public IpAddress subId;
+		// remove path for either CCAP or Gates
 		public Set<String> removePathList = new HashSet<String>();
 
 		public InstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
@@ -356,8 +363,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					if (subsInstance != null) {
 						SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
 						if (subKey != null) {
-							String subId = getIpAddressStr(subKey.getSubId());
-							gatePathMap.put("subId", subId);
+							subId = subKey.getSubId();
+							String subIdStr = getIpAddressStr(subId);
+							gatePathMap.put("subId", subIdStr);
 						}
 					}
 					InstanceIdentifier<Gates> gatesInstance = thisInstance.firstIdentifierOf(Gates.class);
@@ -471,8 +479,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				String gateId = gate.getGateId();
 				String gatePathStr = thisData.gatePath + "/" + gateId ;
 				gateMap.put(gatePathStr, gate);
-				pcmmService.sendGateSet(gatePathStr, gate);
-				logger.info("onDataChanged(): created QoS gate: " + gateId + " @ " + gatePathStr + "/" + gate);
+				IpAddress subId = thisData.subId;
+				pcmmService.sendGateSet(gatePathStr, subId, gate);
+				logger.info("onDataChanged(): created QoS gate {} for {} @ {}/{}: ", gateId, subId, gatePathStr, gate);
 			}
 			break;
 		case updated:

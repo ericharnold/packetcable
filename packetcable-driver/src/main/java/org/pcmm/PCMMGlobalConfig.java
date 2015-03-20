@@ -1,7 +1,7 @@
 /**
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -9,6 +9,12 @@
  */
 
 package org.pcmm;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import org.pcmm.gates.IPCMMGate;
+import org.pcmm.gates.ITransactionID;
 
 public class PCMMGlobalConfig {
     // System
@@ -69,8 +75,8 @@ public class PCMMGlobalConfig {
      public static String SubscriberID = "10.32.104.2";
      public static String srcIP = "10.32.154.2";
  */
- 
-/*  LAB Bench Layout 
+
+/*  LAB Bench Layout
      public static String DefaultCMTS = "10.32.15.3";
      public static String SubscriberID = "10.32.115.143";
      public static String dstIP = "10.32.0.234";
@@ -99,6 +105,9 @@ public class PCMMGlobalConfig {
     public static int getGateID2() {
         return GateID2;
     }
+
+    // Global TransactionId to Gate Request map allows recovery of CCAP GateIds
+    public static Map<Short, IPCMMGate> transactionGateMap = new HashMap<Short, IPCMMGate>();
 }
 
 /*

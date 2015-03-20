@@ -115,7 +115,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	private Map<ServiceClassName, List<Ccaps>> upstreamScnMap = new ConcurrentHashMap<ServiceClassName, List<Ccaps>>();
 	private PcmmService pcmmService;
 
-	// keys to the /restconf/config/packetcable:ccaps and /restconf/config/packetcable:qos datastores
+	// keys to the /restconf/config/packetcable:ccaps and /restconf/config/packetcable:qos config datastore
 	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
 	public static final InstanceIdentifier<Qos> qosIID = InstanceIdentifier.builder(Qos.class).build();
 
@@ -362,12 +362,13 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			return true;
         }
 
-        public Boolean sendGateDelete(IGateID gateId) {
+        public Boolean sendGateDelete(PCMMGateReq gateReq) {
+            logger.info("CcapClient: sendGateDelete(): {}:{} => {}", ipv4, port, gateReq);
         	try {
                 pcmmSender = new PCMMPdpMsgSender(PCMMDef.C_PCMM, pcmmPdp.getClientHandle(), pcmmPdp.getSocket());
-				pcmmSender.sendGateDelete(gateId.getGateID());
+				pcmmSender.sendGateDelete(gateReq);
 			} catch (COPSPdpException e) {
-                logger.error("CcapClient: sendGateDelete(): {}:{} => {} FAILED: {}", ipv4, port, gateId, e.getMessage());
+                logger.error("CcapClient: sendGateDelete(): {}:{} => {} FAILED: {}", ipv4, port, gateReq, e.getMessage());
 			}
 			return true;
         }
@@ -429,19 +430,63 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			gateBuilder.build(qosGate.getTrafficProfile());
 			gateBuilder.build(qosGate.getClassifier());
-			// send it to the CCAP
+			// assemble the final gate request
 			PCMMGateReq gateReq = gateBuilder.getGateReq();
-			boolean ret = ccapClient.sendGateSet(gateReq);
 			// and remember it
 			gateRequests.put(gatePathStr, gateReq);
-			return ret;
+			// and send it to the CCAP
+			boolean ret = ccapClient.sendGateSet(gateReq);
+			// and wait for the response to complete
+			try {
+				synchronized(gateReq) {
+					gateReq.wait(1000);
+				}
+			} catch (InterruptedException e) {
+                logger.error("PCMMService: sendGateSet(): gate response timeout exceeded for {}/{}",
+                		gatePathStr, gateReq);
+			}
+			if (gateReq.getError() != null) {
+				logger.warn("PCMMService: sendGateSet(): returned error: {}", gateReq.getError().toString());
+				return false;
+			} else {
+				if (gateReq.getGateID() != null) {
+					logger.info(String.format("PCMMService: sendGateSet(): returned GateId %08x: ", gateReq.getGateID().getGateID()));
+				} else {
+					logger.info("PCMMService: sendGateSet(): no gateId returned:");
+				}
+				return true;
+			}
 		}
 
 		public Boolean sendGateDelete(Ccaps ccap, String gatePathStr) {
 			CcapClient ccapClient = ccapClients.get(ccap);
+			// recover the original gate request
 			PCMMGateReq gateReq = gateRequests.remove(gatePathStr);
-			Boolean ret = ccapClient.sendGateDelete(gateReq.getGateID());
-			return ret;
+			if (gateReq != null) {
+				Boolean ret = ccapClient.sendGateDelete(gateReq);
+				// and wait for the response to complete
+				try {
+					synchronized(gateReq) {
+						gateReq.wait(1000);
+					}
+				} catch (InterruptedException e) {
+	                logger.error("PCMMService: sendGateDelete(): gate response timeout exceeded for {}/{}",
+	                		gatePathStr, gateReq);
+				}
+				if (gateReq.getError() != null) {
+					logger.warn("PCMMService: sendGateDelete(): returned error: {}", gateReq.getError().toString());
+					return false;
+				} else {
+					if (gateReq.getGateID() != null) {
+						logger.info(String.format("PCMMService: sendGateDelete(): deleted GateId %08x: ", gateReq.getGateID().getGateID()));
+					} else {
+						logger.info("PCMMService: sendGateDelete(): deleted but no gateId returned");
+					}
+					return true;
+				}
+			} else {
+				return false;
+			}
 		}
 /*
 		public Boolean sendGateSynchronize() {

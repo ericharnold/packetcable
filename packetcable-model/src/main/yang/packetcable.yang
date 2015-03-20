@@ -16,13 +16,8 @@ module packetcable
    
 	// Global typedefs
 	typedef service-class-name {
-        type string;
-        description "
-	        length 2 to 128 max
-	        The Service Class Name is MUST be 2-128 bytes of null-terminated ASCII string. 
-	        (Refer to section C.2.2.3.4 of [MULPI]).  This name MUST be padded with null bytes 
-	        to align on a 4-byte boundary.
-        ";
+        type string { length "2..16"; }
+        description "The Service Class Name is MUST be 2-16 bytes.";
     }
     typedef service-flow-direction {
 	    type enumeration {
@@ -97,15 +92,28 @@ module packetcable
 	            default false;
 	        }
         }
+        container amId {
+        	leaf am-tag {
+        		type uint16;
+        		description "Application Manager Tag -- unique for this operator";
+        	}
+        	leaf am-type {
+         		type uint16;
+        		description "Application Manager Type -- unique for this AM tag";
+        	}
+        }
 		leaf-list subscriber-subnets {
 			type inet:ip-prefix;			
 		}
-		leaf-list service-class-names {
+		leaf-list upstream-scns {
+			type service-class-name;
+		}
+		leaf-list downstream-scns {
 			type service-class-name;
 		}
 	}
 	
-	// PCMM QoS gates
+	// PCMM QoS Gates
     container qos {
     	description "
     		PCMM QoS Gates are organized as a tree by Application/Subscriber/Gate:
@@ -161,7 +169,15 @@ module packetcable
     	container gate-spec {
 			leaf direction {
 				type service-flow-direction;
-				description "Gate Direction (must match SCN dir attribute)";
+				description "Gate Direction (ignored for traffic profile SCN)";
+			}
+			leaf dscp-tos-overwrite {
+				type tos-byte;
+				description "Optional DSCP/TOS overwrite value";
+			}
+			leaf dscp-tos-mask {
+				type tos-byte;
+				description "Optional DSCP/TOS overwrite AND mask";
 			}
 		}
     }

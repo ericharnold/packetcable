@@ -19,7 +19,9 @@ public class DOCSISServiceClassNameTrafficProfile extends PCMMBaseObject
             implements ITrafficProfile {
 
     public static final byte STYPE = 2;
-    public static final short LENGTH = 12;
+    // NB. length 12, 16, 20, or 24 only
+    // 24 supports max size 16 char SCN
+    public static final short LENGTH = 24;
 
     /**
      *

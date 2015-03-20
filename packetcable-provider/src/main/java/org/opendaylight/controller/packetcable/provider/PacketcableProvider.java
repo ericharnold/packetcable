@@ -3,12 +3,15 @@ package org.opendaylight.controller.packetcable.provider;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.net.InetAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,15 +30,20 @@ import org.opendaylight.controller.md.sal.common.api.data.AsyncDataBroker.DataCh
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
-import org.opendaylight.controller.packetcable.provider.processors.PCMMDataProcessor;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpPrefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Prefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Ccaps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.CcapsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Qos;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmId;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.Apps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.AppsKey;
@@ -99,10 +107,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	private ListenerRegistration<DataChangeListener> listenerRegistration;
 	private List<InstanceIdentifier<?>> cmtsInstances = Lists.newArrayList();
 
-	private Map<String, Ccaps> ccapMap = Maps.newConcurrentMap();
+	private Map<String, Ccaps> ccapMap = new ConcurrentHashMap<String, Ccaps>();
 	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
+	private Map<String, Ccaps> gateCcapMap = new ConcurrentHashMap<String, Ccaps>();
+	private Map<Subnet, Ccaps> subscriberSubnetsMap = new ConcurrentHashMap<Subnet, Ccaps>();
+	private Map<ServiceClassName, List<Ccaps>> downstreamScnMap = new ConcurrentHashMap<ServiceClassName, List<Ccaps>>();
+	private Map<ServiceClassName, List<Ccaps>> upstreamScnMap = new ConcurrentHashMap<ServiceClassName, List<Ccaps>>();
 	private PcmmService pcmmService;
 
+	// keys to the /restconf/config/packetcable:ccaps and /restconf/config/packetcable:qos datastores
 	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
 	public static final InstanceIdentifier<Qos> qosIID = InstanceIdentifier.builder(Qos.class).build();
 
@@ -115,8 +128,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 //		this.notificationProvider = salService;
 //	}
 
-	public void setDataBroker(final DataBroker salDataProvider) {
-		this.dataBroker = salDataProvider;
+	public void setDataBroker(final DataBroker salDataBroker) {
+		this.dataBroker = salDataBroker;
 	}
 
 	/**
@@ -143,6 +156,158 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 		}
 	}
+
+	private class InetPrefix {
+
+		private String _address;
+		private int _prefLen;
+		private boolean _isIpv6;
+		private IpAddress _ipAddress;
+		private Ccaps _ccap;
+
+		public InetPrefix(IpPrefix ipPrefix) {
+			parsePrefix(ipPrefix);
+		}
+		private void parsePrefix(IpPrefix ipPrefix) {
+			_isIpv6 = false;
+			String prefix = "0.0.0.0/0";
+			if (ipPrefix.getIpv4Prefix() != null) {
+				prefix = ipPrefix.getIpv4Prefix().getValue();
+			} else if (ipPrefix.getIpv6Prefix() != null) {
+				prefix = ipPrefix.getIpv6Prefix().getValue();
+				_isIpv6 = true;
+			}
+			String[] parts = prefix.split("/");
+			_address = parts[0];
+			_prefLen = Integer.parseInt(parts[1]);
+			if (_isIpv6) {
+				Ipv6Address ipv6 = Ipv6Address.getDefaultInstance(_address);
+				_ipAddress = new IpAddress(ipv6);
+			} else {
+				Ipv4Address ipv4 = Ipv4Address.getDefaultInstance(_address);
+				_ipAddress = new IpAddress(ipv4);
+			}
+		}
+		public int getPrefixLen() {
+			return _prefLen;
+		}
+		public String getAddress() {
+			return _address;
+		}
+		public IpAddress getIpAddress() {
+			return _ipAddress;
+		}
+		public Ipv4Address getIpv4Address() {
+			return _ipAddress.getIpv4Address();
+		}
+		public Ipv6Address getIpv6Address() {
+			return _ipAddress.getIpv6Address();
+		}
+		public void setCcap(Ccaps ccap) {
+			_ccap = ccap;
+		}
+		public Ccaps getCcap() {
+			return _ccap;
+		}
+	}
+
+	private String getIpAddressStr(IpAddress ipAddress) {
+		String ipAddressStr = null;
+		Ipv4Address ipv4 = ipAddress.getIpv4Address();
+
+		if (ipv4 != null) {
+			ipAddressStr = ipv4.getValue();
+		} else {
+			Ipv6Address ipv6 = ipAddress.getIpv6Address();
+			ipAddressStr = ipv6.getValue();
+		}
+		return ipAddressStr;
+	}
+
+	private String getIpPrefixStr(IpPrefix ipPrefix) {
+		String ipPrefixStr = null;
+		Ipv4Prefix ipv4 = ipPrefix.getIpv4Prefix();
+		if (ipv4 != null) {
+			ipPrefixStr = ipv4.getValue();
+		} else {
+			Ipv6Prefix ipv6 = ipPrefix.getIpv6Prefix();
+			ipPrefixStr = ipv6.getValue();
+		}
+		return ipPrefixStr;
+	}
+
+	private void updateCcapMaps(Ccaps ccap) {
+		// add ccap to the subscriberSubnets map
+		for (IpPrefix ipPrefix : ccap.getSubscriberSubnets()) {
+			Subnet subnet = null;
+			try {
+				subnet = Subnet.createInstance(getIpPrefixStr(ipPrefix));
+			} catch (UnknownHostException e) {
+				logger.error("updateSubscriberSubnets: {}:{} FAILED: {}", ipPrefix, ccap, e.getMessage());
+			}
+			subscriberSubnetsMap.put(subnet, ccap);
+		}
+		// ccap to upstream SCN map
+		for (ServiceClassName scn : ccap.getUpstreamScns()) {
+			if (upstreamScnMap.containsKey(scn)) {
+				upstreamScnMap.get(scn).add(ccap);
+			} else {
+				List<Ccaps> ccapList = new ArrayList<Ccaps>();
+				ccapList.add(ccap);
+				upstreamScnMap.put(scn, ccapList);
+			}
+		}
+		// ccap to downstream SCN map
+		for (ServiceClassName scn : ccap.getDownstreamScns()) {
+			if (downstreamScnMap.containsKey(scn)) {
+				downstreamScnMap.get(scn).add(ccap);
+			} else {
+				List<Ccaps> ccapList = new ArrayList<Ccaps>();
+				ccapList.add(ccap);
+				downstreamScnMap.put(scn, ccapList);
+			}
+		}
+	}
+
+	private Ccaps getSubscriberSubnetsLPM(IpAddress ipAddress) {
+		String ipAddressStr = getIpAddressStr(ipAddress);
+		InetAddress inetAddr = null;
+		try {
+			inetAddr = InetAddress.getByName(ipAddressStr);
+		} catch (UnknownHostException e) {
+			logger.error("getSubscriberSubnetsLPM: {} FAILED: {}", ipAddressStr, e.getMessage());
+		}
+		Ccaps matchedCcap = null;
+		int longestPrefixLen = -1;
+		for (Map.Entry<Subnet, Ccaps> entry : subscriberSubnetsMap.entrySet()) {
+			Subnet subnet = entry.getKey();
+			Ccaps thisCcap = entry.getValue();
+			if (subnet.isInNet(inetAddr)) {
+				int prefixLen = subnet.getPrefixLen();
+				if (prefixLen > longestPrefixLen) {
+					matchedCcap = thisCcap;
+					longestPrefixLen = prefixLen;
+				}
+			}
+		}
+		return matchedCcap;
+	}
+
+	private ServiceFlowDirection findScnOnCcap(ServiceClassName scn, Ccaps ccap) {
+		if (upstreamScnMap.containsKey(scn)) {
+			List<Ccaps> ccapList = upstreamScnMap.get(scn);
+			if (ccapList.contains(ccap)) {
+				return ServiceFlowDirection.Us;
+			}
+		} else if (downstreamScnMap.containsKey(scn)) {
+			List<Ccaps> ccapList = downstreamScnMap.get(scn);
+			if (ccapList.contains(ccap)) {
+				return ServiceFlowDirection.Ds;
+			}
+		}
+		return null;
+	}
+
 
 	/*
 	 * PCMM services -- locally implemented from packetcable-consumer.PcmmServiceImpl.java
@@ -192,16 +357,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			} catch (COPSPdpException e) {
                 logger.error("CcapClient: sendGateSet(): {}:{} => {} FAILED: {}", ipv4, port, gateReq, e.getMessage());
 			}
-        	int count = 3;
-        	while (count > 0 && pcmmSender.getGateID() == null) {
-        		// wait up to 3 seconds for pcmmSender.handleGateReport(socket) to come back with gateID
-        		try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					break;
-				}
-        		count--;
-        	}
         	// and save it back to the gateRequest object for gate delete later
     		gateReq.setGateID(pcmmSender.getGateID());
 			return true;
@@ -214,66 +369,78 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			} catch (COPSPdpException e) {
                 logger.error("CcapClient: sendGateDelete(): {}:{} => {} FAILED: {}", ipv4, port, gateId, e.getMessage());
 			}
-
 			return true;
-
         }
-
 	}
 
 	private class PcmmService {
-		private Map<IpAddress, CcapClient> ccapClients = Maps.newConcurrentMap();
+		private Map<Ccaps, CcapClient> ccapClients = Maps.newConcurrentMap();
 		private Map<String, PCMMGateReq> gateRequests = Maps.newConcurrentMap();
 
 		public PcmmService() {
 		}
 
 		public void addCcap(Ccaps ccap) {
+			String ccapId = ccap.getCcapId();
 			IpAddress ipAddr = ccap.getConnection().getIpAddress();
 			PortNumber port = ccap.getConnection().getPort();
 			String ipv4 = ipAddr.getIpv4Address().getValue();
-			logger.info("addCcap(): " + ipv4);
+			logger.info("addCcap() {} @ {}: ", ccapId, ipv4);
 			CcapClient client = new CcapClient();
 			client.connect(ipAddr, port);
 			if (client.isConnected) {
-				ccapClients.put(ipAddr, client);
-				logger.info("addCcap(): connected:" + ipv4);
+				ccapClients.put(ccap, client);
+				logger.info("addCcap(): connected: {} @ {}", ccapId, ipv4);
 			}
 		}
 
 		public void removeCcap(Ccaps ccap) {
+			String ccapId = ccap.getCcapId();
 			IpAddress ipAddr = ccap.getConnection().getIpAddress();
 			String ipv4 = ipAddr.getIpv4Address().getValue();
-			logger.info("removeCcap(): " + ipv4);
-			if (ccapClients.containsKey(ipAddr)) {
-				CcapClient client = ccapClients.remove(ipAddr);
+			logger.info("removeCcap() {} @ {}: ", ccapId, ipv4);
+			if (ccapClients.containsKey(ccap)) {
+				CcapClient client = ccapClients.remove(ccap);
 				client.disconnect();
-				logger.info("removeCcap(): disconnected: " + ipv4);
+				logger.info("removeCcap(): disconnected: {} @ {}", ccapId, ipv4);
 			}
 		}
 
-		public Boolean sendGateSet(String gatePathStr, IpAddress qosSubId, Gates qosGate) {
-			//TODO: find the matching CCAP for this subId
-			CcapClient ccap = ccapClients.values().iterator().next();
-			// build the gate request for this subId
-			PCMMDataProcessor gateBuilder = new PCMMDataProcessor();
+		public Boolean sendGateSet(Ccaps ccap, String gatePathStr, IpAddress qosSubId, Gates qosGate) {
+			CcapClient ccapClient = ccapClients.get(ccap);
+			// assemble the gate request for this subId
+			PCMMGateReqBuilder gateBuilder = new PCMMGateReqBuilder();
+			gateBuilder.build(ccap.getAmId());
 			gateBuilder.build(getIpAddressStr(qosSubId));
-			gateBuilder.build(qosGate.getGateSpec());
+			// validate SCN exists on CCAP and force gateSpec.Direction to align with SCN direction
+			ServiceClassName scn = qosGate.getTrafficProfile().getServiceClassName();
+			if (scn != null) {
+				ServiceFlowDirection scnDir = findScnOnCcap(scn, ccap);
+				if (scnDir != null) {
+					gateBuilder.build(qosGate.getGateSpec(), scnDir);
+				} else {
+	                logger.error("PCMMService: sendGateSet(): SCN {} not found on CCAP {} for {}/{}",
+	                		scn, ccap, gatePathStr, qosGate);
+	                return false;
+				}
+			} else {
+				// not an SCN gate
+				gateBuilder.build(qosGate.getGateSpec(), null);
+			}
 			gateBuilder.build(qosGate.getTrafficProfile());
 			gateBuilder.build(qosGate.getClassifier());
 			// send it to the CCAP
 			PCMMGateReq gateReq = gateBuilder.getGateReq();
-			boolean ret = ccap.sendGateSet(gateReq);
+			boolean ret = ccapClient.sendGateSet(gateReq);
 			// and remember it
 			gateRequests.put(gatePathStr, gateReq);
 			return ret;
 		}
 
-		public Boolean sendGateDelete(String gatePathStr) {
-			//TODO: find the matching CCAP for this subId
-			CcapClient ccap = ccapClients.values().iterator().next();
+		public Boolean sendGateDelete(Ccaps ccap, String gatePathStr) {
+			CcapClient ccapClient = ccapClients.get(ccap);
 			PCMMGateReq gateReq = gateRequests.remove(gatePathStr);
-			Boolean ret = ccap.sendGateDelete(gateReq.getGateID());
+			Boolean ret = ccapClient.sendGateDelete(gateReq.getGateID());
 			return ret;
 		}
 /*
@@ -404,17 +571,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private String getIpAddressStr(IpAddress ipAddress) {
-		String ipAddr = "";
-		Ipv4Address ipv4 = ipAddress.getIpv4Address();
-		Ipv6Address ipv6 = ipAddress.getIpv6Address();
-		ipAddr = ipv4.getValue();
-		if (ipAddr == "") {
-			ipAddr = ipv6.getValue();
-		}
-		return ipAddr;
-	}
-
 
 	private enum ChangeAction {created, updated, removed};
 
@@ -473,15 +629,28 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				logger.info("onDataChanged(): created CCAP: " + thisData.gatePath + "/" + thisCcap);
 				ccapMap.put(ccapId, thisCcap);
 				pcmmService.addCcap(thisCcap);
-			}
-			// get the PCMM gate parameters from the cmtsId/appId/subId/gateId path in the Maps entry (if new gate)
-			for (Gates gate : thisData.gateList) {
-				String gateId = gate.getGateId();
-				String gatePathStr = thisData.gatePath + "/" + gateId ;
-				gateMap.put(gatePathStr, gate);
-				IpAddress subId = thisData.subId;
-				pcmmService.sendGateSet(gatePathStr, subId, gate);
-				logger.info("onDataChanged(): created QoS gate {} for {} @ {}/{}: ", gateId, subId, gatePathStr, gate);
+				updateCcapMaps(thisCcap);
+			} else {
+				// get the PCMM gate parameters from the cmtsId/appId/subId/gateId path in the Maps entry (if new gate)
+				for (Gates gate : thisData.gateList) {
+					String gateId = gate.getGateId();
+					String gatePathStr = thisData.gatePath + "/" + gateId ;
+					IpAddress subId = thisData.subId;
+					thisCcap = getSubscriberSubnetsLPM(subId);
+					if (thisCcap != null) {
+						gateMap.put(gatePathStr, gate);
+						gateCcapMap.put(gatePathStr, thisCcap);
+						ccapId = thisCcap.getCcapId();
+						if (pcmmService.sendGateSet(thisCcap, gatePathStr, subId, gate)) {
+							logger.info("onDataChanged(): created QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, gate);
+						} else {
+							logger.error("onDataChanged(): Unable to create QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, gate);
+						}
+					} else {
+						String subIdStr = thisData.gatePathMap.get("subId");
+						logger.error("onDataChanged(): create QoS gate {} FAILED: no CCAP found for {}: @ {}/{} ", gateId, subIdStr, gatePathStr, gate);
+					}
+				}
 			}
 			break;
 		case updated:
@@ -496,29 +665,32 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				pcmmService.removeCcap(lastCcap);
 				// and add back the new one
 				pcmmService.addCcap(thisCcap);
-			}
-			for (Gates gate : thisData.gateList) {
-				String gateId = gate.getGateId();
-				String gatePathStr = thisData.gatePath + "/" + gateId ;
-				lastGate = gateMap.get(gatePathStr);
-				logger.info("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
+			} else {
+				for (Gates gate : thisData.gateList) {
+					String gateId = gate.getGateId();
+					String gatePathStr = thisData.gatePath + "/" + gateId ;
+					lastGate = gateMap.get(gatePathStr);
+					logger.info("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
+				}
 			}
 			break;
 		case removed:
 			// remove gates before removing CMTS
 			for (String gatePathStr: thisData.removePathList) {
 				if (gateMap.containsKey(gatePathStr)) {
-					lastGate = gateMap.remove(gatePathStr);
-					pcmmService.sendGateDelete(gatePathStr);
-					logger.info("onDataChanged(): removed QoS gate: " + gatePathStr + "/" + lastGate);
+					thisGate = gateMap.remove(gatePathStr);
+					String gateId = thisGate.getGateId();
+					thisCcap = gateCcapMap.remove(gatePathStr);
+					ccapId = thisCcap.getCcapId();
+					pcmmService.sendGateDelete(thisCcap, gatePathStr);
+					logger.info("onDataChanged(): removed QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, thisGate);
 				}
 			}
 			for (String ccapIdStr: thisData.removePathList) {
 				if (ccapMap.containsKey(ccapIdStr)) {
 					thisCcap = ccapMap.remove(ccapIdStr);
-					logger.info("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
-					ccapMap.remove(ccapIdStr);
 					pcmmService.removeCcap(thisCcap);
+					logger.info("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
 				}
 			}
 			break;

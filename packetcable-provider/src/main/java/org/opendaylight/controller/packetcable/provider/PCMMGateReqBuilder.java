@@ -1,7 +1,7 @@
 /**
  *
  */
-package org.opendaylight.controller.packetcable.provider.processors;
+package org.opendaylight.controller.packetcable.provider;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -14,7 +14,9 @@ import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TosByte;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TpProtocol;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmId;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gate.spec.GateSpec;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.profile.TrafficProfile;
@@ -25,6 +27,7 @@ import org.pcmm.gates.IAMID;
 import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.IGateSpec;
+import org.pcmm.gates.IGateSpec.DSCPTOS;
 import org.pcmm.gates.ISubscriberID;
 import org.pcmm.gates.IGateSpec.Direction;
 import org.pcmm.gates.ITrafficProfile;
@@ -43,26 +46,25 @@ import org.slf4j.LoggerFactory;
  * PacketCable data processor
  *
  */
-public class PCMMDataProcessor {
+public class PCMMGateReqBuilder {
 
-	private Logger logger = LoggerFactory.getLogger(PCMMDataProcessor.class);
+	private Logger logger = LoggerFactory.getLogger(PCMMGateReqBuilder.class);
 
 	private PCMMGateReq gateReq = new org.pcmm.gates.impl.PCMMGateReq();
 
-	public PCMMDataProcessor() {
+	public PCMMGateReqBuilder() {
 		gateReq = new org.pcmm.gates.impl.PCMMGateReq();
-		gateReq.setAMID(setAmId(1, 1));
 	}
 
 	public PCMMGateReq getGateReq() {
 		return gateReq;
 	}
 
-	private IAMID setAmId(int amType, int amTag){
-		IAMID amid = new org.pcmm.gates.impl.AMID();
-        amid.setApplicationType((short)amType);
-        amid.setApplicationMgrTag((short)amTag);
-        return amid;
+	public void build(AmId qosAmId){
+		IAMID amId = new org.pcmm.gates.impl.AMID();
+		amId.setApplicationMgrTag(qosAmId.getAmTag().shortValue());
+		amId.setApplicationType(qosAmId.getAmType().shortValue());
+        gateReq.setAMID(amId);
 	}
 
 	public void build(String qosSubId){
@@ -77,27 +79,47 @@ public class PCMMDataProcessor {
 		gateReq.setSubscriberID(subId);
 	}
 
-	public void build(GateSpec qosGateSpec) {
+	public void build(GateSpec qosGateSpec, ServiceFlowDirection scnDirection) {
 		IGateSpec gateSpec = new org.pcmm.gates.impl.GateSpec();
-		if (qosGateSpec.getDirection() != null) {
-			ServiceFlowDirection qosDir = qosGateSpec.getDirection();
-			Direction dir = null;
-			if (qosDir == qosDir.Ds) {
-				dir = Direction.DOWNSTREAM;
-			} else if (qosDir == qosDir.Us) {
-				dir = Direction.UPSTREAM;
+		// service flow direction
+		ServiceFlowDirection qosDir = null;
+		Direction gateDir = null;
+		if (scnDirection != null) {
+			qosDir = scnDirection;
+		} else if (qosGateSpec.getDirection() != null) {
+			qosDir = qosGateSpec.getDirection();
+		}
+		if (qosDir == ServiceFlowDirection.Ds) {
+			gateDir = Direction.DOWNSTREAM;
+		} else if (qosDir == ServiceFlowDirection.Us) {
+			gateDir = Direction.UPSTREAM;
+		}
+		gateSpec.setDirection(gateDir);
+		// DSCP/TOS Overwrite
+		TosByte tosOverwrite = qosGateSpec.getDscpTosOverwrite();
+		if (tosOverwrite != null) {
+			byte gateTos = tosOverwrite.getValue().byteValue();
+			gateSpec.setDSCP_TOSOverwrite(gateTos);
+			TosByte tosMask = qosGateSpec.getDscpTosMask();
+			if (tosMask != null) {
+				byte gateTosMask = tosMask.getValue().byteValue();
+				gateSpec.setDSCP_TOSMask(gateTosMask);
+			} else {
+				gateSpec.setDSCP_TOSMask((byte)0xff);
 			}
-			gateSpec.setDirection(dir);
 		}
 		gateReq.setGateSpec(gateSpec);
 	}
 
 	public void build(TrafficProfile qosTrafficProfile) {
-		DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
 		if (qosTrafficProfile.getServiceClassName() != null) {
-			trafficProfile.setServiceClassName(qosTrafficProfile.getServiceClassName().getValue());
+			String scn = qosTrafficProfile.getServiceClassName().getValue();
+			DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
+			if (scn.length() <= 16) { // NB.16 char SCN is max length per PCMM spec
+				trafficProfile.setServiceClassName(scn);
+				gateReq.setTrafficProfile(trafficProfile);
+			}
 		}
-		gateReq.setTrafficProfile(trafficProfile);
 	}
 
 	private InetAddress getByName(Ipv4Address ipv4){

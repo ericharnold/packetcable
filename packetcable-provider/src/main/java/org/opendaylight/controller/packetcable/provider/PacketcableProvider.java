@@ -429,7 +429,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				gateBuilder.build(qosGate.getGateSpec(), null);
 			}
 			gateBuilder.build(qosGate.getTrafficProfile());
-			gateBuilder.build(qosGate.getClassifier());
+
+			// pick a classifier type (only one for now)
+			if (qosGate.getClassifier() != null) {
+				gateBuilder.build(qosGate.getClassifier());
+			} else if (qosGate.getExtClassifier() != null) {
+				gateBuilder.build(qosGate.getExtClassifier());
+			} else if (qosGate.getIpv6Classifier() != null) {
+				gateBuilder.build(qosGate.getIpv6Classifier());
+			}
 			// assemble the final gate request
 			PCMMGateReq gateReq = gateBuilder.getGateReq();
 			// and remember it

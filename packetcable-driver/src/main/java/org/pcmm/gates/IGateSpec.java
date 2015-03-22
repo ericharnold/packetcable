@@ -82,7 +82,7 @@ public interface IGateSpec extends IPCMMBaseObject {
      */
     public enum DSCPTOS {
 
-        ENABLE((byte) 1), OVERRIDE((byte) 0);
+        ENABLE((byte) 2), OVERRIDE((byte) 0);
 
         private DSCPTOS(byte value) {
             this.value = value;
@@ -229,7 +229,10 @@ public interface IGateSpec extends IPCMMBaseObject {
      *
      * @param dscpTos
      */
+    // set the DSCPTOS enable flag
     void setDSCP_TOSOverwrite(DSCPTOS dscpTos);
+    // set the DSCP_TOS value
+	void setDSCP_TOSOverwrite(byte dscpTos);
 
     /**
      *
@@ -249,6 +252,5 @@ public interface IGateSpec extends IPCMMBaseObject {
      */
     void setDSCP_TOSMask(byte dscp_tos_mask);
 
-	void setDSCP_TOSOverwrite(byte dscpTos);
 
 }

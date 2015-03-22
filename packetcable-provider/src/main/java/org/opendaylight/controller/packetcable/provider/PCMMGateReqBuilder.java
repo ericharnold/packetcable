@@ -18,7 +18,9 @@ import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TosByte;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TpProtocol;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmId;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ext.classifier.ExtClassifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gate.spec.GateSpec;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ipv6.classifier.Ipv6Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.profile.TrafficProfile;
 import org.pcmm.PCMMPdpAgent;
 import org.pcmm.PCMMPdpDataProcess;
@@ -28,6 +30,7 @@ import org.pcmm.gates.IClassifier;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.IGateSpec;
 import org.pcmm.gates.IGateSpec.DSCPTOS;
+import org.pcmm.gates.IIPv6Classifier;
 import org.pcmm.gates.ISubscriberID;
 import org.pcmm.gates.IGateSpec.Direction;
 import org.pcmm.gates.ITrafficProfile;
@@ -50,7 +53,7 @@ public class PCMMGateReqBuilder {
 
 	private Logger logger = LoggerFactory.getLogger(PCMMGateReqBuilder.class);
 
-	private PCMMGateReq gateReq = new org.pcmm.gates.impl.PCMMGateReq();
+	private PCMMGateReq gateReq = null;
 
 	public PCMMGateReqBuilder() {
 		gateReq = new org.pcmm.gates.impl.PCMMGateReq();
@@ -99,6 +102,7 @@ public class PCMMGateReqBuilder {
 		TosByte tosOverwrite = qosGateSpec.getDscpTosOverwrite();
 		if (tosOverwrite != null) {
 			byte gateTos = tosOverwrite.getValue().byteValue();
+			gateSpec.setDSCP_TOSOverwrite(DSCPTOS.ENABLE);
 			gateSpec.setDSCP_TOSOverwrite(gateTos);
 			TosByte tosMask = qosGateSpec.getDscpTosMask();
 			if (tosMask != null) {
@@ -122,10 +126,10 @@ public class PCMMGateReqBuilder {
 		}
 	}
 
-	private InetAddress getByName(Ipv4Address ipv4){
+	private InetAddress getByName(String ipAddressStr){
 		InetAddress ipAddress = null;
 		try {
-			ipAddress = InetAddress.getByName(ipv4.getValue());
+			ipAddress = InetAddress.getByName(ipAddressStr);
 		} catch (UnknownHostException e) {
 			logger.error(e.getMessage());
 		}
@@ -144,13 +148,13 @@ public class PCMMGateReqBuilder {
 			classifier.setProtocol(IClassifier.Protocol.NONE);
 		}
 		if (qosClassifier.getSrcIp() != null) {
-			InetAddress sip = getByName(qosClassifier.getSrcIp());
+			InetAddress sip = getByName(qosClassifier.getSrcIp().getValue());
 			if (sip != null) {
 				classifier.setSourceIPAddress(sip);
 			}
 		}
 		if (qosClassifier.getDstIp() != null) {
-			InetAddress dip = getByName(qosClassifier.getDstIp());
+			InetAddress dip = getByName(qosClassifier.getDstIp().getValue());
 			if (dip != null) {
 				classifier.setDestinationIPAddress(dip);
 			}
@@ -172,7 +176,129 @@ public class PCMMGateReqBuilder {
 		}
 		gateReq.setClassifier(classifier);
 	}
-/*
+
+	public void build(ExtClassifier qosExtClassifier) {
+		// Extended classifier
+		IExtendedClassifier extClassifier = new org.pcmm.gates.impl.ExtendedClassifier();
+		extClassifier.setPriority((byte) 64);
+		extClassifier.setActivationState((byte) 0x01);
+		if (qosExtClassifier.getProtocol() == TpProtocol.Tcp){
+			extClassifier.setProtocol(IClassifier.Protocol.TCP);
+		} else if (qosExtClassifier.getProtocol() == TpProtocol.Udp){
+			extClassifier.setProtocol(IClassifier.Protocol.UDP);
+		} else {
+			extClassifier.setProtocol(IClassifier.Protocol.NONE);
+		}
+		if (qosExtClassifier.getSrcIp() != null) {
+			InetAddress sip = getByName(qosExtClassifier.getSrcIp().getValue());
+			if (sip != null) {
+				extClassifier.setSourceIPAddress(sip);
+				if (qosExtClassifier.getSrcIpMask() != null) {
+					InetAddress sipMask = getByName(qosExtClassifier.getSrcIpMask().getValue());
+					extClassifier.setIPSourceMask(sipMask);
+				} else {
+					// default mask is /32
+					extClassifier.setIPSourceMask(getByName("255.255.255.255"));
+				}
+			}
+		}
+		if (qosExtClassifier.getDstIp() != null) {
+			InetAddress dip = getByName(qosExtClassifier.getDstIp().getValue());
+			if (dip != null) {
+				extClassifier.setDestinationIPAddress(dip);
+				if (qosExtClassifier.getDstIpMask() != null) {
+					InetAddress dipMask = getByName(qosExtClassifier.getDstIpMask().getValue());
+					extClassifier.setIPDestinationMask(dipMask);
+				} else {
+					// default mask is /32
+					extClassifier.setIPDestinationMask(getByName("255.255.255.255"));
+				}
+			}
+		}
+		if (qosExtClassifier.getSrcPortStart() != null) {
+			extClassifier.setSourcePortStart(qosExtClassifier.getSrcPortStart().getValue().shortValue());
+			if (qosExtClassifier.getSrcPortEnd() != null) {
+				extClassifier.setSourcePortEnd(qosExtClassifier.getSrcPortEnd().getValue().shortValue());
+			} else {
+				// default portStart = portEnd
+				extClassifier.setSourcePortEnd(qosExtClassifier.getSrcPortStart().getValue().shortValue());
+			}
+		}
+		if (qosExtClassifier.getDstPortStart() != null) {
+			extClassifier.setDestinationPortStart(qosExtClassifier.getDstPortStart().getValue().shortValue());
+			if (qosExtClassifier.getDstPortEnd() != null) {
+				extClassifier.setDestinationPortEnd(qosExtClassifier.getDstPortEnd().getValue().shortValue());
+			} else {
+				// default portStart = portEnd
+				extClassifier.setDestinationPortEnd(qosExtClassifier.getDstPortStart().getValue().shortValue());
+			}
+		}
+		if (qosExtClassifier.getTosByte() != null) {
+			extClassifier.setDSCPTOS(qosExtClassifier.getTosByte().getValue().byteValue());
+			if (qosExtClassifier.getTosMask() != null) {
+				extClassifier.setDSCPTOSMask(qosExtClassifier.getTosMask().getValue().byteValue());
+			} else {
+				// set default TOS mask
+				extClassifier.setDSCPTOSMask((byte)0xff);
+			}
+		}
+		gateReq.setClassifier(extClassifier);
+	}
+
+	public void build(Ipv6Classifier qosIpv6Classifier) {
+		// Extended classifier
+		IIPv6Classifier extClassifier = new org.pcmm.gates.impl.IPv6Classifier();
+		extClassifier.setPriority((byte) 64);
+		if (qosIpv6Classifier.getNextHdr() == TpProtocol.Tcp){
+			extClassifier.setProtocol(IClassifier.Protocol.TCP);
+		} else if (qosIpv6Classifier.getNextHdr() == TpProtocol.Udp){
+			extClassifier.setProtocol(IClassifier.Protocol.UDP);
+		} else {
+			extClassifier.setProtocol(IClassifier.Protocol.NONE);
+		}
+		if (qosIpv6Classifier.getSrcIp6() != null) {
+			InetAddress sip = getByName(qosIpv6Classifier.getSrcIp6().getValue());
+			if (sip != null) {
+				extClassifier.setSourceIPAddress(sip);
+			}
+		}
+		if (qosIpv6Classifier.getDstIp6() != null) {
+			InetAddress dip = getByName(qosIpv6Classifier.getDstIp6().getValue());
+			if (dip != null) {
+				extClassifier.setDestinationIPAddress(dip);
+			}
+		}
+		if (qosIpv6Classifier.getSrcPortStart() != null) {
+			extClassifier.setSourcePortStart(qosIpv6Classifier.getSrcPortStart().getValue().shortValue());
+			if (qosIpv6Classifier.getSrcPortEnd() != null) {
+				extClassifier.setSourcePortEnd(qosIpv6Classifier.getSrcPortEnd().getValue().shortValue());
+			} else {
+				// default portStart = portEnd
+				extClassifier.setSourcePortEnd(qosIpv6Classifier.getSrcPortStart().getValue().shortValue());
+			}
+		}
+		if (qosIpv6Classifier.getDstPortStart() != null) {
+			extClassifier.setDestinationPortStart(qosIpv6Classifier.getDstPortStart().getValue().shortValue());
+			if (qosIpv6Classifier.getDstPortEnd() != null) {
+				extClassifier.setDestinationPortEnd(qosIpv6Classifier.getDstPortEnd().getValue().shortValue());
+			} else {
+				// default portStart = portEnd
+				extClassifier.setDestinationPortEnd(qosIpv6Classifier.getDstPortStart().getValue().shortValue());
+			}
+		}
+		if (qosIpv6Classifier.getTcLow() != null) {
+			extClassifier.setDSCPTOS(qosIpv6Classifier.getTcLow().getValue().byteValue());
+			if (qosIpv6Classifier.getTcMask() != null) {
+				extClassifier.setDSCPTOSMask(qosIpv6Classifier.getTcMask().getValue().byteValue());
+			} else {
+				// set default TOS mask
+				extClassifier.setDSCPTOSMask((byte)0xff);
+			}
+		}
+		gateReq.setClassifier(extClassifier);
+	}
+
+	/*
 	private void getTcpMatchRangesValues(TcpMatchRangesAttributes tcpRange, IExtendedClassifier classifier) {
 		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
 		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;

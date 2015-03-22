@@ -18,7 +18,10 @@ import org.pcmm.gates.ISessionClassID;
  */
 public class GateSpec extends PCMMBaseObject implements IGateSpec {
 
-    public GateSpec() {
+    // GateSpec flags are Direction (bit 0) and DSCPTOS overwrite enable (bit 1)
+	private byte flags = 0;
+
+	public GateSpec() {
         super(LENGTH, STYPE, SNUM);
     }
 
@@ -43,7 +46,9 @@ public class GateSpec extends PCMMBaseObject implements IGateSpec {
 
     @Override
     public void setDirection(Direction direction) {
-        setByte(direction.getValue(), (short) 0);
+    	// OR in the Direction flag with the DSCPTOS enable flag
+    	flags |= direction.getValue();
+        setByte(flags, (short) 0);
     }
 
     @Override
@@ -90,11 +95,14 @@ public class GateSpec extends PCMMBaseObject implements IGateSpec {
 
     @Override
     public void setDSCP_TOSOverwrite(DSCPTOS dscpTos) {
-        setByte(dscpTos.getValue(), (short) 1);
+    	// OR in the DSCPTOS enable flag with the Direction flag
+    	flags |= dscpTos.getValue();
+        setByte(flags, (short) 0);
     }
+
     @Override
     public void setDSCP_TOSOverwrite(byte dscpTos) {
-        setByte(dscpTos, (short) 2);
+        setByte(dscpTos, (short) 1);
     }
 
 

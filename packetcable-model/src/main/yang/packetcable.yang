@@ -192,17 +192,17 @@ module packetcable
     }
     
     grouping tp-port-match-ranges {
-        leaf srcPort-begin {
+        leaf srcPort-start {
             type inet:port-number;
-            description "TCP/UDP source port range begin.";
+            description "TCP/UDP source port range start.";
         }
         leaf srcPort-end {
             type inet:port-number;
             description "TCP/UDP source port range end.";
         }
-        leaf dstPort-begin {
+        leaf dstPort-start {
             type inet:port-number;
-            description "TCP/UDP destination port range begin.";
+            description "TCP/UDP destination port range start.";
         }
         leaf dstPort-end {
             type inet:port-number;
@@ -246,12 +246,20 @@ module packetcable
     grouping pcmm-qos-ext-classifier {
     	container ext-classifier {
 	    	leaf srcIp {
-	    		type inet:ipv4-prefix;
-	    		description "Source IPv4 prefix match in  <address/len> notation";
+	    		type inet:ipv4-address;
+	    		description "Source IPv4 address match";
+			}
+	    	leaf srcIpMask {
+	    		type inet:ipv4-address;
+	    		description "Source IPv4 mask";
 			}
 	    	leaf dstIp {
-	    		type inet:ipv4-prefix;
-	    		description "Destination IPv4 prefix match in <address/len> notation";
+	    		type inet:ipv4-address;
+	    		description "Destination IPv4 address match";
+			}
+	    	leaf dstIpMask {
+	    		type inet:ipv4-address;
+	    		description "Destination IPv4 mask";
 			}
 	 		leaf tos-byte {
 	 			type tos-byte;

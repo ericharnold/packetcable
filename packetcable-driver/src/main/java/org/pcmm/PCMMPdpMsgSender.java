@@ -416,7 +416,7 @@ public class PCMMPdpMsgSender {
         // XXX - if the version major is less than 4 we need to use Classifier
         if (true) {
             //eclassifier.setProtocol(IClassifier.Protocol.NONE);
-            eclassifier.setProtocol(IClassifier.Protocol.TCP);
+//            eclassifier.setProtocol(IClassifier.Protocol.TCP);
             try {
                 InetAddress subIP = InetAddress
                                     .getByName(PCMMGlobalConfig.SubscriberID);
@@ -453,7 +453,7 @@ public class PCMMPdpMsgSender {
             eclassifier.setPriority((byte) 65);
 
         } else {
-            classifier.setProtocol(IClassifier.Protocol.TCP);
+//            classifier.setProtocol(IClassifier.Protocol.TCP);
             try {
                 InetAddress subIP = InetAddress
                                     .getByName(PCMMGlobalConfig.SubscriberID);
@@ -610,7 +610,7 @@ public class PCMMPdpMsgSender {
         // XXX - if the version major is less than 4 we need to use Classifier
         if (true) {
             //eclassifier.setProtocol(IClassifier.Protocol.NONE);
-            eclassifier.setProtocol(IClassifier.Protocol.TCP);
+//            eclassifier.setProtocol(IClassifier.Protocol.TCP);
             try {
                 InetAddress subIP = InetAddress
                                     .getByName(PCMMGlobalConfig.SubscriberID);
@@ -647,7 +647,7 @@ public class PCMMPdpMsgSender {
             eclassifier.setPriority((byte) 65);
 
         } else {
-            classifier.setProtocol(IClassifier.Protocol.TCP);
+//            classifier.setProtocol(IClassifier.Protocol.TCP);
             try {
                 InetAddress subIP = InetAddress
                                     .getByName(PCMMGlobalConfig.SubscriberID);
@@ -806,7 +806,7 @@ public class PCMMPdpMsgSender {
          * .setServiceClassName("S_up");
          */
 
-        classifier.setProtocol(IClassifier.Protocol.TCP);
+//        classifier.setProtocol(IClassifier.Protocol.TCP);
         try {
             InetAddress subIP = InetAddress.getByName(PCMMGlobalConfig.SubscriberID);
             InetAddress srcIP = InetAddress.getByName(PCMMGlobalConfig.srcIP);

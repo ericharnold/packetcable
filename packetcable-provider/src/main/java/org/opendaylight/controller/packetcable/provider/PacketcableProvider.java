@@ -157,60 +157,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private class InetPrefix {
-
-		private String _address;
-		private int _prefLen;
-		private boolean _isIpv6;
-		private IpAddress _ipAddress;
-		private Ccaps _ccap;
-
-		public InetPrefix(IpPrefix ipPrefix) {
-			parsePrefix(ipPrefix);
-		}
-		private void parsePrefix(IpPrefix ipPrefix) {
-			_isIpv6 = false;
-			String prefix = "0.0.0.0/0";
-			if (ipPrefix.getIpv4Prefix() != null) {
-				prefix = ipPrefix.getIpv4Prefix().getValue();
-			} else if (ipPrefix.getIpv6Prefix() != null) {
-				prefix = ipPrefix.getIpv6Prefix().getValue();
-				_isIpv6 = true;
-			}
-			String[] parts = prefix.split("/");
-			_address = parts[0];
-			_prefLen = Integer.parseInt(parts[1]);
-			if (_isIpv6) {
-				Ipv6Address ipv6 = Ipv6Address.getDefaultInstance(_address);
-				_ipAddress = new IpAddress(ipv6);
-			} else {
-				Ipv4Address ipv4 = Ipv4Address.getDefaultInstance(_address);
-				_ipAddress = new IpAddress(ipv4);
-			}
-		}
-		public int getPrefixLen() {
-			return _prefLen;
-		}
-		public String getAddress() {
-			return _address;
-		}
-		public IpAddress getIpAddress() {
-			return _ipAddress;
-		}
-		public Ipv4Address getIpv4Address() {
-			return _ipAddress.getIpv4Address();
-		}
-		public Ipv6Address getIpv6Address() {
-			return _ipAddress.getIpv6Address();
-		}
-		public void setCcap(Ccaps ccap) {
-			_ccap = ccap;
-		}
-		public Ccaps getCcap() {
-			return _ccap;
-		}
-	}
-
 	private String getIpAddressStr(IpAddress ipAddress) {
 		String ipAddressStr = null;
 		Ipv4Address ipv4 = ipAddress.getIpv4Address();

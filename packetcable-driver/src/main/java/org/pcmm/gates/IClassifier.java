@@ -1,7 +1,7 @@
 /**
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -93,14 +93,16 @@ public interface IClassifier extends IPCMMBaseObject {
      *
      * @return the protocol.
      */
-    Protocol getProtocol();
+//    Protocol getProtocol();
+    short getProtocol();
 
     /**
      * @see <a
      *      href="http://www.iana.org/assignments/protocol-numbers/protocol-numbers.txt">protocols</a>
      * @param p
      */
-    void setProtocol(Protocol p);
+//    void setProtocol(Protocol p);
+	void setProtocol(short p);
 
     /**
      * Priority may be used to distinguish between multiple classifiers that
@@ -126,6 +128,8 @@ public interface IClassifier extends IPCMMBaseObject {
     byte getDSCPTOSMask();
 
     void setDSCPTOSMask(byte v);
+
+
 
     // DSCP/TOS Field
     // 

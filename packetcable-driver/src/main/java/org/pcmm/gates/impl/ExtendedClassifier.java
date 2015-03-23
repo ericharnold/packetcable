@@ -1,7 +1,7 @@
 /**
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -137,9 +137,13 @@ public class ExtendedClassifier extends PCMMBaseObject implements
      *
      * @see org.pcmm.gates.IClassifier#getProtocol()
      */
+//    @Override
+//    public Protocol getProtocol() {
+//        return Protocol.valueOf(getShort((short) 0));
+//    }
     @Override
-    public Protocol getProtocol() {
-        return Protocol.valueOf(getShort((short) 0));
+    public short getProtocol() {
+        return getShort((short) 0);
     }
 
     /*
@@ -147,9 +151,13 @@ public class ExtendedClassifier extends PCMMBaseObject implements
      *
      * @see org.pcmm.gates.IClassifier#setProtocol(short)
      */
+//    @Override
+//    public void setProtocol(Protocol p) {
+//        setShort(p.getValue(), (short) 0);
+//    }
     @Override
-    public void setProtocol(Protocol p) {
-        setShort(p.getValue(), (short) 0);
+    public void setProtocol(short p) {
+        setShort(p, (short) 0);
     }
 
     /*

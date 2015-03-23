@@ -33,21 +33,8 @@ module packetcable
     	description "This value represents the service flow direction.";
   	}
  	typedef tp-protocol {
-	    type enumeration {
-		      enum tcp_or_udp {
-		        value "256";
-		        description "Either TCP or UDP protocol match.";
-		      }
-		      enum tcp {
-		        value "6";
-		        description "TCP protocol match.";
-		      }
-		      enum udp {
-		        value "17";
-		        description "UDP protocol match.";
-		      }
-	    }
-	    description "This value represents the IP transport protocol (or Next Header).";
+ 		type uint16 {range "0..257";}
+	    description "This value represents the IP transport protocol (or Next Header) where 256 is any protocol and 257 is TCP or UDP";
 	 }
 	 typedef tos-byte {
 	 	type uint8;
@@ -86,11 +73,6 @@ module packetcable
 	        	description "COPS session TCP port number";
 	        	default 3918;
 	    	}
-	        leaf connected {
-	            type boolean;
-	            description "COPS session connected state";
-	            default false;
-	        }
         }
         container amId {
         	leaf am-tag {
@@ -111,6 +93,10 @@ module packetcable
 		leaf-list downstream-scns {
 			type service-class-name;
 		}
+        leaf response {
+            type string;
+            description "HTTP response from the PUT operation provided by the API";
+        }
 	}
 	
 	// PCMM QoS Gates
@@ -163,6 +149,10 @@ module packetcable
   		uses pcmm-qos-classifier;
  		uses pcmm-qos-ext-classifier;
  		uses pcmm-qos-ipv6-classifier;
+ 		leaf response {
+            type string;
+            description "HTTP response from the PUT operation provided by the API";
+        }
     }
     
     grouping pcmm-qos-gate-spec {

@@ -1,7 +1,7 @@
 /**
- * 
+ *
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -61,9 +61,9 @@ import org.umu.cops.stack.COPSReportMsg;
 import org.umu.cops.stack.COPSReqMsg;
 
 /**
- * 
+ *
  * PCMM policy server
- * 
+ *
  */
 public class PCMMPolicyServer extends AbstractPCMMServer implements
 		IPCMMPolicyServer {
@@ -78,7 +78,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see
 	 * org.pcmm.rcd.IPCMMPolicyServer#requestCMTSConnection(java.lang.String)
 	 */
@@ -94,7 +94,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see
 	 * org.pcmm.rcd.IPCMMPolicyServer#requestCMTSConnection(java.net.InetAddress
 	 * )
@@ -178,7 +178,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 	}
 
 	/**
-	 * 
+	 *
 	 * @see {@link IPSCMTSClient}
 	 */
 	/* public */static class PSCMTSClient extends AbstractPCMMClient implements
@@ -272,7 +272,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 		/*
 		 * (non-Javadoc)
-		 * 
+		 *
 		 * @see org.pcmm.rcd.IPCMMPolicyServer#gateDelete()
 		 */
 		@Override
@@ -352,7 +352,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 		/*
 		 * (non-Javadoc)
-		 * 
+		 *
 		 * @see org.pcmm.rcd.IPCMMPolicyServer#gateInfo()
 		 */
 		@Override
@@ -444,7 +444,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 		/*
 		 * (non-Javadoc)
-		 * 
+		 *
 		 * @see org.pcmm.rcd.IPCMMPolicyServer#synchronize()
 		 */
 		@Override
@@ -547,7 +547,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 			if (getVersionInfo().getMajorVersionNB() >= 4) {
 				classifier = new ExtendedClassifier();
 				// eclassifier.setProtocol(IClassifier.Protocol.NONE);
-				classifier.setProtocol(IClassifier.Protocol.TCP);
+//				classifier.setProtocol(IClassifier.Protocol.TCP);
 				try {
 					InetAddress subIP = InetAddress.getByName(PCMMGlobalConfig.SubscriberID);
 					InetAddress srcIP = InetAddress.getByName(PCMMGlobalConfig.srcIP);
@@ -580,7 +580,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 
 			} else {
 				classifier = new Classifier();
-				classifier.setProtocol(IClassifier.Protocol.TCP);
+//				classifier.setProtocol(IClassifier.Protocol.TCP);
 				try {
 					InetAddress subIP = InetAddress.getByName(PCMMGlobalConfig.SubscriberID);
 					InetAddress srcIP = InetAddress.getByName(PCMMGlobalConfig.srcIP);
@@ -598,7 +598,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 		}
 
 		/**
-		 * 
+		 *
 		 * @return GateSpec object
 		 */
 		private IGateSpec getGateSpec() {
@@ -615,7 +615,7 @@ public class PCMMPolicyServer extends AbstractPCMMServer implements
 		/**
 		 * creates a traffic profile with 3 envelops (Authorized, Reserved and
 		 * Committed).
-		 * 
+		 *
 		 * @return Traffic profile
 		 */
 		private ITrafficProfile buildTrafficProfile() {

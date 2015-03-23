@@ -27,6 +27,7 @@ import org.pcmm.PCMMPdpDataProcess;
 import org.pcmm.PCMMPdpMsgSender;
 import org.pcmm.gates.IAMID;
 import org.pcmm.gates.IClassifier;
+import org.pcmm.gates.IClassifier.Protocol;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.IGateSpec;
 import org.pcmm.gates.IGateSpec.DSCPTOS;
@@ -140,12 +141,8 @@ public class PCMMGateReqBuilder {
 		// Legacy classifier
 		IClassifier classifier = new org.pcmm.gates.impl.Classifier();
 		classifier.setPriority((byte) 64);
-		if (qosClassifier.getProtocol() == TpProtocol.Tcp){
-			classifier.setProtocol(IClassifier.Protocol.TCP);
-		} else if (qosClassifier.getProtocol() == TpProtocol.Udp){
-			classifier.setProtocol(IClassifier.Protocol.UDP);
-		} else {
-			classifier.setProtocol(IClassifier.Protocol.NONE);
+		if (qosClassifier.getProtocol() != null){
+			classifier.setProtocol(qosClassifier.getProtocol().getValue().shortValue());
 		}
 		if (qosClassifier.getSrcIp() != null) {
 			InetAddress sip = getByName(qosClassifier.getSrcIp().getValue());
@@ -174,6 +171,7 @@ public class PCMMGateReqBuilder {
 				classifier.setDSCPTOSMask((byte)0xff);
 			}
 		}
+		// push the classifier to the gate request
 		gateReq.setClassifier(classifier);
 	}
 
@@ -182,13 +180,11 @@ public class PCMMGateReqBuilder {
 		IExtendedClassifier extClassifier = new org.pcmm.gates.impl.ExtendedClassifier();
 		extClassifier.setPriority((byte) 64);
 		extClassifier.setActivationState((byte) 0x01);
-		if (qosExtClassifier.getProtocol() == TpProtocol.Tcp){
-			extClassifier.setProtocol(IClassifier.Protocol.TCP);
-		} else if (qosExtClassifier.getProtocol() == TpProtocol.Udp){
-			extClassifier.setProtocol(IClassifier.Protocol.UDP);
-		} else {
-			extClassifier.setProtocol(IClassifier.Protocol.NONE);
+		// Protocol -- zero is match any
+		if (qosExtClassifier.getProtocol() != null){
+			extClassifier.setProtocol(qosExtClassifier.getProtocol().getValue().shortValue());
 		}
+		// Source IP address & mask
 		if (qosExtClassifier.getSrcIp() != null) {
 			InetAddress sip = getByName(qosExtClassifier.getSrcIp().getValue());
 			if (sip != null) {
@@ -202,6 +198,7 @@ public class PCMMGateReqBuilder {
 				}
 			}
 		}
+		// Destination IP address & mask
 		if (qosExtClassifier.getDstIp() != null) {
 			InetAddress dip = getByName(qosExtClassifier.getDstIp().getValue());
 			if (dip != null) {
@@ -215,26 +212,44 @@ public class PCMMGateReqBuilder {
 				}
 			}
 		}
+		// default source port range must be set to match any even if qosExtClassifier has no range
+		// match any port range is 0-65535, NOT 0-0
+		short startPort = (short)0;
+		short endPort = (short)65535;
 		if (qosExtClassifier.getSrcPortStart() != null) {
-			extClassifier.setSourcePortStart(qosExtClassifier.getSrcPortStart().getValue().shortValue());
+			startPort = qosExtClassifier.getSrcPortStart().getValue().shortValue();
+			endPort = startPort;
 			if (qosExtClassifier.getSrcPortEnd() != null) {
-				extClassifier.setSourcePortEnd(qosExtClassifier.getSrcPortEnd().getValue().shortValue());
-			} else {
-				// default portStart = portEnd
-				extClassifier.setSourcePortEnd(qosExtClassifier.getSrcPortStart().getValue().shortValue());
+				endPort = qosExtClassifier.getSrcPortEnd().getValue().shortValue();
+			}
+			if (startPort > endPort) {
+				logger.warn("Start port %d > End port %d in ext-classifier source port range -- forcing to same", startPort, endPort);
+				endPort = startPort;
 			}
 		}
+		extClassifier.setSourcePortStart(startPort);
+		extClassifier.setSourcePortEnd(endPort);
+		// default destination port range must be set to match any even if qosExtClassifier has no range
+		// match any port range is 0-65535, NOT 0-0
+		startPort = (short)0;
+		endPort = (short)65535;
 		if (qosExtClassifier.getDstPortStart() != null) {
-			extClassifier.setDestinationPortStart(qosExtClassifier.getDstPortStart().getValue().shortValue());
+			startPort = qosExtClassifier.getDstPortStart().getValue().shortValue();
+			endPort = startPort;
 			if (qosExtClassifier.getDstPortEnd() != null) {
-				extClassifier.setDestinationPortEnd(qosExtClassifier.getDstPortEnd().getValue().shortValue());
-			} else {
-				// default portStart = portEnd
-				extClassifier.setDestinationPortEnd(qosExtClassifier.getDstPortStart().getValue().shortValue());
+				endPort = qosExtClassifier.getDstPortEnd().getValue().shortValue();
+			}
+			if (startPort > endPort) {
+				logger.warn("Start port %d > End port %d in ext-classifier destination port range -- forcing to same", startPort, endPort);
+				endPort = startPort;
 			}
 		}
+		extClassifier.setDestinationPortStart(startPort);
+		extClassifier.setDestinationPortEnd(endPort);
+		// DSCP/TOP byte
 		if (qosExtClassifier.getTosByte() != null) {
-			extClassifier.setDSCPTOS(qosExtClassifier.getTosByte().getValue().byteValue());
+			// OR in the DSCP/TOS enable bit 0x01
+			extClassifier.setDSCPTOS((byte) (qosExtClassifier.getTosByte().getValue().byteValue() | 0x01));
 			if (qosExtClassifier.getTosMask() != null) {
 				extClassifier.setDSCPTOSMask(qosExtClassifier.getTosMask().getValue().byteValue());
 			} else {
@@ -242,112 +257,103 @@ public class PCMMGateReqBuilder {
 				extClassifier.setDSCPTOSMask((byte)0xff);
 			}
 		}
+		// push the extended classifier to the gate request
 		gateReq.setClassifier(extClassifier);
 	}
 
 	public void build(Ipv6Classifier qosIpv6Classifier) {
-		// Extended classifier
-		IIPv6Classifier extClassifier = new org.pcmm.gates.impl.IPv6Classifier();
-		extClassifier.setPriority((byte) 64);
-		if (qosIpv6Classifier.getNextHdr() == TpProtocol.Tcp){
-			extClassifier.setProtocol(IClassifier.Protocol.TCP);
-		} else if (qosIpv6Classifier.getNextHdr() == TpProtocol.Udp){
-			extClassifier.setProtocol(IClassifier.Protocol.UDP);
+		// IPv6 classifier
+		IIPv6Classifier ipv6Classifier = new org.pcmm.gates.impl.IPv6Classifier();
+		ipv6Classifier.setPriority((byte) 64);
+		ipv6Classifier.setActivationState((byte) 0x01);
+		// Flow Label
+		if (qosIpv6Classifier.getFlowLabel() != null){
+			ipv6Classifier.setFlowLabel(qosIpv6Classifier.getFlowLabel());
+			ipv6Classifier.setFlowLabelEnableFlag((byte)0x01);
+		}
+		// Next Header
+		if (qosIpv6Classifier.getNextHdr() != null){
+			ipv6Classifier.setNextHdr(qosIpv6Classifier.getNextHdr().getValue().shortValue());
 		} else {
-			extClassifier.setProtocol(IClassifier.Protocol.NONE);
+			// default: match any nextHdr is 256 because nextHdr 0 is Hop-by-Hop option
+			ipv6Classifier.setNextHdr((short)256);
 		}
+		// Source IPv6 address & prefix len
 		if (qosIpv6Classifier.getSrcIp6() != null) {
-			InetAddress sip = getByName(qosIpv6Classifier.getSrcIp6().getValue());
-			if (sip != null) {
-				extClassifier.setSourceIPAddress(sip);
+			String[] parts = qosIpv6Classifier.getSrcIp6().getValue().split("/");
+			String Ipv6AddressStr = parts[0];
+			byte prefLen = (byte) Integer.parseInt(parts[1]);
+			InetAddress sip6 = getByName(Ipv6AddressStr);
+			if (sip6 != null) {
+				ipv6Classifier.setSourceIPAddress(sip6);
 			}
+			ipv6Classifier.setSourcePrefixLen(prefLen);
 		}
+		// Destination IPv6 address & prefix len
 		if (qosIpv6Classifier.getDstIp6() != null) {
-			InetAddress dip = getByName(qosIpv6Classifier.getDstIp6().getValue());
-			if (dip != null) {
-				extClassifier.setDestinationIPAddress(dip);
+			String[] parts = qosIpv6Classifier.getDstIp6().getValue().split("/");
+			String Ipv6AddressStr = parts[0];
+			byte prefLen = (byte) Integer.parseInt(parts[1]);
+			InetAddress dip6 = getByName(Ipv6AddressStr);
+			if (dip6 != null) {
+				ipv6Classifier.setDestinationIPAddress(dip6);
 			}
+			ipv6Classifier.setDestinationPrefixLen(prefLen);
 		}
+		// default source port range must be set to match any -- even if qosExtClassifier has no range value
+		// match any port range is 0-65535, NOT 0-0
+		short startPort = (short)0;
+		short endPort = (short)65535;
 		if (qosIpv6Classifier.getSrcPortStart() != null) {
-			extClassifier.setSourcePortStart(qosIpv6Classifier.getSrcPortStart().getValue().shortValue());
+			startPort = qosIpv6Classifier.getSrcPortStart().getValue().shortValue();
+			endPort = startPort;
 			if (qosIpv6Classifier.getSrcPortEnd() != null) {
-				extClassifier.setSourcePortEnd(qosIpv6Classifier.getSrcPortEnd().getValue().shortValue());
-			} else {
-				// default portStart = portEnd
-				extClassifier.setSourcePortEnd(qosIpv6Classifier.getSrcPortStart().getValue().shortValue());
+				endPort = qosIpv6Classifier.getSrcPortEnd().getValue().shortValue();
+			}
+			if (startPort > endPort) {
+				logger.warn("Start port %d > End port %d in ipv6-classifier source port range -- forcing to same", startPort, endPort);
+				endPort = startPort;
 			}
 		}
+		ipv6Classifier.setSourcePortStart(startPort);
+		ipv6Classifier.setSourcePortEnd(endPort);
+		// default destination port range must be set to match any -- even if qosExtClassifier has no range value
+		// match any port range is 0-65535, NOT 0-0
+		startPort = (short)0;
+		endPort = (short)65535;
 		if (qosIpv6Classifier.getDstPortStart() != null) {
-			extClassifier.setDestinationPortStart(qosIpv6Classifier.getDstPortStart().getValue().shortValue());
+			startPort = qosIpv6Classifier.getDstPortStart().getValue().shortValue();
+			endPort = startPort;
 			if (qosIpv6Classifier.getDstPortEnd() != null) {
-				extClassifier.setDestinationPortEnd(qosIpv6Classifier.getDstPortEnd().getValue().shortValue());
-			} else {
-				// default portStart = portEnd
-				extClassifier.setDestinationPortEnd(qosIpv6Classifier.getDstPortStart().getValue().shortValue());
+				endPort = qosIpv6Classifier.getDstPortEnd().getValue().shortValue();
+			}
+			if (startPort > endPort) {
+				logger.warn("Start port %d > End port %d in ipv6-classifier destination port range -- forcing to same", startPort, endPort);
+				endPort = startPort;
 			}
 		}
+		ipv6Classifier.setDestinationPortStart(startPort);
+		ipv6Classifier.setDestinationPortEnd(endPort);
+		// TC low, high, mask
 		if (qosIpv6Classifier.getTcLow() != null) {
-			extClassifier.setDSCPTOS(qosIpv6Classifier.getTcLow().getValue().byteValue());
+			ipv6Classifier.setTcLow(qosIpv6Classifier.getTcLow().getValue().byteValue());
+			if (qosIpv6Classifier.getTcHigh() != null) {
+				ipv6Classifier.setTcHigh(qosIpv6Classifier.getTcHigh().getValue().byteValue());
+			}
 			if (qosIpv6Classifier.getTcMask() != null) {
-				extClassifier.setDSCPTOSMask(qosIpv6Classifier.getTcMask().getValue().byteValue());
+				ipv6Classifier.setTcMask(qosIpv6Classifier.getTcMask().getValue().byteValue());
 			} else {
 				// set default TOS mask
-				extClassifier.setDSCPTOSMask((byte)0xff);
+				ipv6Classifier.setTcMask((byte)0xff);
 			}
+		} else {
+			// mask 0x00 is match any
+			ipv6Classifier.setTcMask((byte)0x00);
 		}
-		gateReq.setClassifier(extClassifier);
+		// push the IPv6 classifier to the gate request
+		gateReq.setClassifier(ipv6Classifier);
 	}
 
-	/*
-	private void getTcpMatchRangesValues(TcpMatchRangesAttributes tcpRange, IExtendedClassifier classifier) {
-		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
-		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
-		if (tcpRange != null) {
-			classifier.setProtocol(IClassifier.Protocol.TCP);
-			TcpMatchRanges tcpMatchRanges = tcpRange.getTcpMatchRanges();
-			PortNumber tcpDestinationPortStart = tcpMatchRanges.getTcpDestinationPortStart();
-			if (tcpDestinationPortStart != null && tcpDestinationPortStart.getValue() != null)
-				dstPortStart = tcpDestinationPortStart.getValue().shortValue();
-			PortNumber tcpSourcePortStart = tcpMatchRanges.getTcpSourcePortStart();
-			if (tcpSourcePortStart != null && tcpSourcePortStart.getValue() != null)
-				srcPortStart = tcpSourcePortStart.getValue().shortValue();
-			PortNumber tcpDestinationPortEnd = tcpMatchRanges.getTcpDestinationPortEnd();
-			if (tcpDestinationPortEnd != null && tcpDestinationPortEnd.getValue() != null)
-				dstPortEnd = tcpDestinationPortEnd.getValue().shortValue();
-			PortNumber tcpSourcePortEnd = tcpMatchRanges.getTcpSourcePortEnd();
-			if (tcpSourcePortEnd != null && tcpSourcePortEnd.getValue() != null)
-				srcPortEnd = tcpSourcePortEnd.getValue().shortValue();
-		}
-		classifier.setDestinationPortStart(dstPortStart);
-		classifier.setSourcePortStart(srcPortStart);
-		classifier.setDestinationPortEnd(dstPortEnd);
-		classifier.setSourcePortEnd(srcPortEnd);
-	}
-
-	private void getUdpMatchRangeValues(UdpMatchRangesAttributes udpRange, IExtendedClassifier classifier) {
-		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
-		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
-		if (udpRange != null) {
-			classifier.setProtocol(IClassifier.Protocol.UDP);
-			UdpMatchRanges udpMatchRanges = udpRange.getUdpMatchRanges();
-			PortNumber udpDestinationPortStart = udpMatchRanges.getUdpDestinationPortStart();
-			if (udpDestinationPortStart != null && udpDestinationPortStart.getValue() != null)
-				dstPortStart = udpDestinationPortStart.getValue().shortValue();
-			PortNumber udpSourcePortStart = udpMatchRanges.getUdpSourcePortStart();
-			if (udpSourcePortStart != null && udpSourcePortStart.getValue() != null)
-				srcPortStart = udpSourcePortStart.getValue().shortValue();
-			PortNumber udpDestinationPortEnd = udpMatchRanges.getUdpDestinationPortEnd();
-			if (udpDestinationPortEnd != null && udpDestinationPortEnd.getValue() != null)
-				dstPortEnd = udpDestinationPortEnd.getValue().shortValue();
-			PortNumber udpSourcePortEnd = udpMatchRanges.getUdpSourcePortEnd();
-			if (udpSourcePortEnd != null && udpSourcePortEnd.getValue() != null)
-				srcPortEnd = udpSourcePortEnd.getValue().shortValue();
-		}
-		classifier.setDestinationPortStart(dstPortStart);
-		classifier.setSourcePortStart(srcPortStart);
-		classifier.setDestinationPortEnd(dstPortEnd);
-		classifier.setSourcePortEnd(srcPortEnd);
-	}
 
 	/*
 	public ITrafficProfile process(TrafficProfileBestEffortAttributes bestEffort) {
@@ -358,40 +364,8 @@ public class PCMMGateReqBuilder {
 		return trafficProfile;
 	}
 
-
-	public ITrafficProfile process(TrafficProfileDocsisServiceClassNameAttributes docsis) {
-		DOCSISServiceClassNameTrafficProfile trafficProfile = new DOCSISServiceClassNameTrafficProfile();
-		trafficProfile.setServiceClassName(docsis.getServiceClassName());
-		return trafficProfile;
-	}
-
-	// TODO
 	public ITrafficProfile process(TrafficProfileFlowspecAttributes flowSpec) {
 		throw new UnsupportedOperationException("Not impelemnted yet");
-	}
-
-	public IClassifier process(Match match) {
-		ExtendedClassifier classifier = new ExtendedClassifier();
-		classifier.setProtocol(IClassifier.Protocol.NONE);
-		getUdpMatchRangeValues(match.getAugmentation(UdpMatchRangesRpcAddFlow.class), classifier);
-		getTcpMatchRangesValues(match.getAugmentation(TcpMatchRangesRpcAddFlow.class), classifier);
-		SubscriberIdRpcAddFlow subId = match.getAugmentation(SubscriberIdRpcAddFlow.class);
-		Ipv6Address ipv6Address = subId.getSubscriberId().getIpv6Address();
-		if (ipv6Address != null)
-			try {
-				classifier.setDestinationIPAddress(InetAddress.getByName(ipv6Address.getValue()));
-			} catch (UnknownHostException e) {
-				logger.error(e.getMessage());
-			}
-
-		Ipv4Address ipv4Address = subId.getSubscriberId().getIpv4Address();
-		if (ipv4Address != null)
-			try {
-				classifier.setDestinationIPAddress(InetAddress.getByName(ipv4Address.getValue()));
-			} catch (UnknownHostException e) {
-				logger.error(e.getMessage());
-			}
-		return classifier;
 	}
 
 	private void getBECommittedEnvelop(TrafficProfileBestEffortAttributes bestEffort, BestEffortService trafficProfile) {
@@ -448,55 +422,6 @@ public class PCMMGateReqBuilder {
 		if (beAuthorizedEnvelope.getMaximumSustainedTrafficRate() != null)
 			authorizedEnvelop.setMaximumSustainedTrafficRate(beAuthorizedEnvelope.getMaximumSustainedTrafficRate().intValue());
 	}
-
-	private void getTcpMatchRangesValues(TcpMatchRangesAttributes tcpRange, IExtendedClassifier classifier) {
-		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
-		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
-		if (tcpRange != null) {
-			classifier.setProtocol(IClassifier.Protocol.TCP);
-			TcpMatchRanges tcpMatchRanges = tcpRange.getTcpMatchRanges();
-			PortNumber tcpDestinationPortStart = tcpMatchRanges.getTcpDestinationPortStart();
-			if (tcpDestinationPortStart != null && tcpDestinationPortStart.getValue() != null)
-				dstPortStart = tcpDestinationPortStart.getValue().shortValue();
-			PortNumber tcpSourcePortStart = tcpMatchRanges.getTcpSourcePortStart();
-			if (tcpSourcePortStart != null && tcpSourcePortStart.getValue() != null)
-				srcPortStart = tcpSourcePortStart.getValue().shortValue();
-			PortNumber tcpDestinationPortEnd = tcpMatchRanges.getTcpDestinationPortEnd();
-			if (tcpDestinationPortEnd != null && tcpDestinationPortEnd.getValue() != null)
-				dstPortEnd = tcpDestinationPortEnd.getValue().shortValue();
-			PortNumber tcpSourcePortEnd = tcpMatchRanges.getTcpSourcePortEnd();
-			if (tcpSourcePortEnd != null && tcpSourcePortEnd.getValue() != null)
-				srcPortEnd = tcpSourcePortEnd.getValue().shortValue();
-		}
-		classifier.setDestinationPortStart(dstPortStart);
-		classifier.setSourcePortStart(srcPortStart);
-		classifier.setDestinationPortEnd(dstPortEnd);
-		classifier.setSourcePortEnd(srcPortEnd);
-	}
-
-	private void getUdpMatchRangeValues(UdpMatchRangesAttributes udpRange, IExtendedClassifier classifier) {
-		short srcPortStart, srcPortEnd, dstPortStart, dstPortEnd;
-		srcPortStart = srcPortEnd = dstPortStart = dstPortEnd = 0;
-		if (udpRange != null) {
-			classifier.setProtocol(IClassifier.Protocol.UDP);
-			UdpMatchRanges udpMatchRanges = udpRange.getUdpMatchRanges();
-			PortNumber udpDestinationPortStart = udpMatchRanges.getUdpDestinationPortStart();
-			if (udpDestinationPortStart != null && udpDestinationPortStart.getValue() != null)
-				dstPortStart = udpDestinationPortStart.getValue().shortValue();
-			PortNumber udpSourcePortStart = udpMatchRanges.getUdpSourcePortStart();
-			if (udpSourcePortStart != null && udpSourcePortStart.getValue() != null)
-				srcPortStart = udpSourcePortStart.getValue().shortValue();
-			PortNumber udpDestinationPortEnd = udpMatchRanges.getUdpDestinationPortEnd();
-			if (udpDestinationPortEnd != null && udpDestinationPortEnd.getValue() != null)
-				dstPortEnd = udpDestinationPortEnd.getValue().shortValue();
-			PortNumber udpSourcePortEnd = udpMatchRanges.getUdpSourcePortEnd();
-			if (udpSourcePortEnd != null && udpSourcePortEnd.getValue() != null)
-				srcPortEnd = udpSourcePortEnd.getValue().shortValue();
-		}
-		classifier.setDestinationPortStart(dstPortStart);
-		classifier.setSourcePortStart(srcPortStart);
-		classifier.setDestinationPortEnd(dstPortEnd);
-		classifier.setSourcePortEnd(srcPortEnd);
-	}
 */
+
 }

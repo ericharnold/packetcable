@@ -15,6 +15,8 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.umu.cops.common.COPSDebug;
 import org.umu.cops.ospep.COPSPepException;
 import org.umu.cops.prpdp.COPSPdpAgent;
@@ -41,6 +43,9 @@ import org.pcmm.objects.MMVersionInfo;
  * Core PDP agent for provisioning
  */
 public class PCMMPdpAgent extends COPSPdpAgent {
+
+	private static final Logger logger = LoggerFactory.getLogger(PCMMPdpAgent.class);
+
     /** Well-known port for PCMM */
     public static final int WELL_KNOWN_PDP_PORT = 3918;
 
@@ -125,13 +130,10 @@ public class PCMMPdpAgent extends COPSPdpAgent {
         this.psPort = psPort;
         // Create Socket and send OPN
         InetAddress addr = InetAddress.getByName(psHost);
-        try {
-            socket = new Socket(addr, psPort);
-        } catch (IOException e) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_SOCKET, e);
-            return (false);
-        }
-        COPSDebug.err(getClass().getName(), "PDP Socket Opened");
+        // caller will catch IOExceptions
+        socket = new Socket(addr, psPort);
+        logger.debug("{} {}", getClass().getName(), "PDP Socket Opened");
+//        COPSDebug.err(getClass().getName(), "PDP Socket Opened");
         // Loop through for Incoming messages
 
         // server infinite loop
@@ -140,12 +142,12 @@ public class PCMMPdpAgent extends COPSPdpAgent {
 
             // We're waiting for an message
             try {
-                COPSDebug.err(getClass().getName(),
-                              "PDP  COPSTransceiver.receiveMsg ");
+            	logger.debug("{} {}", getClass().getName(), "PDP  COPSTransceiver.receiveMsg ");
+//            	COPSDebug.err(getClass().getName(),"PDP  COPSTransceiver.receiveMsg ");
                 COPSMsg msg = COPSTransceiver.receiveMsg(socket);
                 if (msg.getHeader().isAClientOpen()) {
-                    COPSDebug.err(getClass().getName(),
-                                  "PDP msg.getHeader().isAClientOpen");
+                	logger.debug("{} {}", getClass().getName(), "PDP msg.getHeader().isAClientOpen");
+//                	COPSDebug.err(getClass().getName(), "PDP msg.getHeader().isAClientOpen");
                     handleClientOpenMsg(socket, msg);
                 } else {
                     // COPSDebug.err(getClass().getName(),
@@ -227,7 +229,7 @@ public class PCMMPdpAgent extends COPSPdpAgent {
         if ((cMsg.getClientSI() != null) ) {
             _mminfo = new MMVersionInfo(cMsg
                                         .getClientSI().getData().getData());
-            System.out.println("CMTS sent MMVersion info : major:"
+            logger.debug("CMTS sent MMVersion info : major:"
                                + _mminfo.getMajorVersionNB() + "  minor:"
                                + _mminfo.getMinorVersionNB());
 
@@ -263,7 +265,7 @@ public class PCMMPdpAgent extends COPSPdpAgent {
         acceptMsg.writeData(conn);
         // XXX - handleRequestMsg
         try {
-            COPSDebug.err(getClass().getName(), "PDP COPSTransceiver.receiveMsg ");
+            logger.debug(getClass().getName(), "PDP COPSTransceiver.receiveMsg ");
             COPSMsg rmsg = COPSTransceiver.receiveMsg(socket);
             // Client-Close
             if (rmsg.getHeader().isAClientClose()) {
@@ -295,7 +297,7 @@ public class PCMMPdpAgent extends COPSPdpAgent {
             throw new COPSException("Error COPSTransceiver.receiveMsg");
         }
 
-        COPSDebug.err(getClass().getName(), "PDPCOPSConnection");
+        logger.debug(getClass().getName(), "PDPCOPSConnection");
         PCMMPdpConnection pdpConn = new PCMMPdpConnection(pepId, conn, _process);
         pdpConn.setKaTimer(getKaTimer());
         if (getAcctTimer() != 0)
@@ -312,7 +314,7 @@ public class PCMMPdpAgent extends COPSPdpAgent {
         }
         // XXX - End handleRequestMsg
 
-        COPSDebug.err(getClass().getName(), "PDP Thread(pdpConn).start");
+        logger.debug(getClass().getName(), "PDP Thread(pdpConn).start");
         new Thread(pdpConn).start();
         getConnectionMap().put(pepId.getData().str(), pdpConn);
     }
@@ -328,16 +330,19 @@ public class PCMMPdpAgent extends COPSPdpAgent {
     throws COPSException, IOException {
 
     	PCMMPdpConnection pdpConn = (PCMMPdpConnection) getConnectionMap().get(pepID);
+    	if (pdpConn != null) {
+            COPSHeader cHdr = new COPSHeader(COPSHeader.COPS_OP_CC, getClientType());
+            COPSClientCloseMsg closeMsg = new COPSClientCloseMsg();
+            closeMsg.add(cHdr);
+            if (error != null)
+                closeMsg.add(error);
 
-        COPSHeader cHdr = new COPSHeader(COPSHeader.COPS_OP_CC, getClientType());
-        COPSClientCloseMsg closeMsg = new COPSClientCloseMsg();
-        closeMsg.add(cHdr);
-        if (error != null)
-            closeMsg.add(error);
+            closeMsg.writeData(pdpConn.getSocket());
+            pdpConn.close();
+            pdpConn = null;
 
-        closeMsg.writeData(pdpConn.getSocket());
-        pdpConn.close();
-        pdpConn = null;
+    	}
+
     }
 
 

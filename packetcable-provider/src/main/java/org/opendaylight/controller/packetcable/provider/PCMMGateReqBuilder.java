@@ -279,13 +279,17 @@ public class PCMMGateReqBuilder {
 			ipv6Classifier.setNextHdr((short)256);
 		}
 		// Source IPv6 address & prefix len
+		byte prefLen = (byte)128;	// default prefix length
 		if (qosIpv6Classifier.getSrcIp6() != null) {
 			String[] parts = qosIpv6Classifier.getSrcIp6().getValue().split("/");
 			String Ipv6AddressStr = parts[0];
-			byte prefLen = (byte) Integer.parseInt(parts[1]);
 			InetAddress sip6 = getByName(Ipv6AddressStr);
 			if (sip6 != null) {
 				ipv6Classifier.setSourceIPAddress(sip6);
+			}
+			prefLen = (byte)128;
+			if (parts.length > 1) {
+				prefLen = (byte)Integer.parseInt(parts[1]);
 			}
 			ipv6Classifier.setSourcePrefixLen(prefLen);
 		}
@@ -293,10 +297,13 @@ public class PCMMGateReqBuilder {
 		if (qosIpv6Classifier.getDstIp6() != null) {
 			String[] parts = qosIpv6Classifier.getDstIp6().getValue().split("/");
 			String Ipv6AddressStr = parts[0];
-			byte prefLen = (byte) Integer.parseInt(parts[1]);
 			InetAddress dip6 = getByName(Ipv6AddressStr);
 			if (dip6 != null) {
 				ipv6Classifier.setDestinationIPAddress(dip6);
+			}
+			prefLen = (byte)128;
+			if (parts.length > 1) {
+				prefLen = (byte)Integer.parseInt(parts[1]);
 			}
 			ipv6Classifier.setDestinationPrefixLen(prefLen);
 		}

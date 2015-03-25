@@ -46,11 +46,18 @@ import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.CcapsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Qos;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TosByte;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.TpProtocol;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmId;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmIdBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.Connection;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.ConnectionBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.ClassifierBuilder;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ext.classifier.ExtClassifier;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ext.classifier.ExtClassifierBuilder;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gate.spec.GateSpec;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gate.spec.GateSpecBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.Apps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.AppsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.Subs;
@@ -58,6 +65,10 @@ import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.app
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.Gates;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.GatesBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.GatesKey;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ipv6.classifier.Ipv6Classifier;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.ipv6.classifier.Ipv6ClassifierBuilder;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.profile.TrafficProfile;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.traffic.profile.TrafficProfileBuilder;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
 import org.opendaylight.yangtools.concepts.CompositeObjectRegistration.CompositeObjectRegistrationBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
@@ -684,10 +695,10 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				return valid;
 			}
 			if (ccap != null) {
-				message = "400 Bad Request - Invalid Element Value in json object - ";
+				message = "400 Bad Request - Invalid Element Values in json object - ";
 				Response response = new Response(ccapIID, ccap, message);
 				if (! validateCcap(ccap, response)) {
-					logger.error(response.message);
+					logger.error("Validate CCAP {} failed - {}", ccap.getCcapId(), response.message);
 					executor.execute(response);
 					valid = false;
 				}
@@ -695,11 +706,10 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				for (Map.Entry<InstanceIdentifier<Gates>, Gates> entry : gateIidMap.entrySet()) {
 					InstanceIdentifier<Gates> gateIID = entry.getKey();
 					Gates gate = entry.getValue();
-					message = validateYangObject(gate);
-					if (message != "") {
-						message = "400 Bad Request - Invalid Element Value in json object - " + message;
-						// set the response string in the config gate object using a new thread
-						Response response = new Response(gateIID, gate, message);
+					message = "400 Bad Request - Invalid Element Values in json object - ";
+					Response response = new Response(gateIID, gate, message);
+					if (! validateGate(gate, response)) {
+						logger.error("Validate Gate {} failed - {}", gate.getGateId(), response.message);
 						executor.execute(response);
 						valid = false;
 					}
@@ -733,7 +743,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				error = e.getMessage();
 				return error;
 			} catch (Exception e) {
-				error = String.format("%s.%s(): Method failed: %s ", thisClass.getSimpleName(), methodName, e.getMessage());
+				error = " ";
+//				error = String.format("%s.%s(): Method failed: %s ", thisClass.getSimpleName(), methodName, e.getMessage());
 				return error;
 			}
 			return error;
@@ -752,6 +763,537 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			return error;
 		}
+
+		private boolean validateGate(Gates gate, Response response) {
+			// validate gate and null out invalid elements as we go
+			String message = "";
+			String error = null;
+			boolean valid = true;
+			boolean rebuild = false;
+			// gate-spec
+			GateSpec gateSpec = gate.getGateSpec();;
+			if (gateSpec != null) {
+				ServiceFlowDirection dir = null;
+				error = validateMethod(GateSpec.class, gateSpec, "getDirection");
+				if (error == null) {
+					dir = gateSpec.getDirection();
+					if (dir != null) {
+						if (gate.getTrafficProfile().getServiceClassName() != null) {
+							message += " gate-spec.direction not allowed for traffic-profile.SCN;";
+							valid = false;
+						}
+					}
+				} else {
+					message += " gate-spec.direction invalid: must be 'us' or 'ds' -" + error;
+					dir = null;
+					valid = false;
+				}
+				TosByte tosByte = null;
+				error = validateMethod(GateSpec.class, gateSpec, "getDscpTosOverwrite");
+				if (error == null) {
+					tosByte = gateSpec.getDscpTosOverwrite();
+				} else {
+					message += " gate-spec.dscp-tos-overwrite invalid: " + error;
+					tosByte = null;
+					valid = false;
+				}
+				TosByte tosMask = null;
+				error = validateMethod(GateSpec.class, gateSpec, "getDscpTosMask");
+				if (error == null) {
+					tosMask = gateSpec.getDscpTosMask();
+					if (tosByte != null && tosMask == null) {
+						message += " gate-spec.dscp-tos-mask missing;";
+						valid = false;
+					}
+				} else {
+					message += " gate-spec.dscp-tos-mask invalid: " + error;
+					tosMask = null;
+					valid = false;
+				}
+				if (! valid) {
+					GateSpecBuilder gateSpecBuilder = new GateSpecBuilder();
+					gateSpecBuilder.setDirection(dir);
+					gateSpecBuilder.setDscpTosOverwrite(tosByte);
+					gateSpecBuilder.setDscpTosMask(tosMask);
+					gateSpec = gateSpecBuilder.build();
+					rebuild = true;
+				}
+			}
+			// traffic-profile
+			error = null;
+			valid = true;
+			TrafficProfile profile = gate.getTrafficProfile();
+			if (profile == null) {
+				message += " traffic-profile is required;";
+				rebuild = true;
+			} else {
+				ServiceClassName scn = null;
+				error = validateMethod(TrafficProfile.class, profile, "getServiceClassName");
+				if (error == null) {
+					scn = profile.getServiceClassName();
+					if (scn == null) {
+						message += " traffic-profile.service-class-name missing;";
+						valid = false;
+					}
+				} else {
+					message += " traffic-profile.service-class-name invalid: must be 2-16 characters " + error;
+					scn = null;
+					valid = false;
+				}
+				if (! valid) {
+					TrafficProfileBuilder profileBuilder = new TrafficProfileBuilder();
+					profileBuilder.setServiceClassName(scn);
+					profile = profileBuilder.build();
+					rebuild = true;
+				}
+			}
+			// classifiers (one of legacy classifier, ext-classifier, or ipv6 classifier
+			Classifier classifier = gate.getClassifier();
+			ExtClassifier extClassifier = gate.getExtClassifier();
+			Ipv6Classifier ipv6Classifier = gate.getIpv6Classifier();
+			valid = true;
+			int count = 0;
+			if (classifier != null) { count++; }
+			if (extClassifier != null) { count++; }
+			if (ipv6Classifier != null) { count++; }
+			if (count == 0){
+				message += " Missing classifer: must have only 1 of classifier, ext-classifier, or ipv6-classifier";
+				rebuild = true;
+			} else if (count > 1) {
+				message += " Multiple classifiers: must have only 1 of classifier, ext-classifier, or ipv6-classifier";
+				rebuild = true;
+			} else if (count == 1) {
+				if (classifier != null) {
+					// validate classifier
+					count = 0;
+					Ipv4Address sip = null;
+					error = validateMethod(Classifier.class, classifier, "getSrcIp");
+					if (error == null) {
+						sip = classifier.getSrcIp();
+						count++;
+					} else {
+						message += " classifier.srcIp invalid: - " + error;
+						sip = null;
+						valid = false;
+					}
+					Ipv4Address dip = null;
+					error = validateMethod(Classifier.class, classifier, "getDstIp");
+					if (error == null) {
+						dip = classifier.getDstIp();
+						count++;
+					} else {
+						message += " classifier.dstIp invalid: - " + error;
+						dip = null;
+						valid = false;
+					}
+					TpProtocol proto = null;
+					error = validateMethod(Classifier.class, classifier, "getProtocol");
+					if (error == null) {
+						proto = classifier.getProtocol();
+						count++;
+					} else {
+						message += " classifier.protocol invalid: - " + error;
+						proto = null;
+						valid = false;
+					}
+					PortNumber sport = null;
+					error = validateMethod(Classifier.class, classifier, "getSrcPort");
+					if (error == null) {
+						sport = classifier.getSrcPort();
+						count++;
+					} else {
+						message += " classifier.srcPort invalid: - " + error;
+						sport = null;
+						valid = false;
+					}
+					PortNumber dport = null;
+					error = validateMethod(Classifier.class, classifier, "getDstPort");
+					if (error == null) {
+						dport = classifier.getDstPort();
+						count++;
+					} else {
+						message += " classifier.dstPort invalid: - " + error;
+						dport = null;
+						valid = false;
+					}
+					TosByte tosByte = null;
+					error = validateMethod(Classifier.class, classifier, "getTosByte");
+					if (error == null) {
+						tosByte = classifier.getTosByte();
+						count++;
+					} else {
+						message += " classifier.tosByte invalid: " + error;
+						tosByte = null;
+						valid = false;
+					}
+					TosByte tosMask = null;
+					error = validateMethod(Classifier.class, classifier, "getTosMask");
+					if (error == null) {
+						tosMask = classifier.getTosMask();
+						if (tosByte != null && tosMask == null) {
+							message += " classifier.tosMask missing;";
+							valid = false;
+						}
+					} else {
+						message += " classifier.tosMask invalid: " + error;
+						tosMask = null;
+						valid = false;
+					}
+					if (count == 0) {
+						message += " classifer must have at least one match field";
+						valid = false;
+					}
+					if (! valid) {
+						ClassifierBuilder cBuilder = new ClassifierBuilder();
+						cBuilder.setSrcIp(sip);
+						cBuilder.setDstIp(dip);
+						cBuilder.setProtocol(proto);
+						cBuilder.setSrcPort(sport);
+						cBuilder.setDstPort(dport);
+						cBuilder.setTosByte(tosByte);
+						cBuilder.setTosMask(tosMask);
+						classifier = cBuilder.build();
+						rebuild = true;
+					}
+				} else if (extClassifier != null) {
+					//validate ext-classifier
+					count = 0;
+					Ipv4Address sip = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getSrcIp");
+					if (error == null) {
+						sip = extClassifier.getSrcIp();
+						count++;
+					} else {
+						message += " ext-classifier.srcIp invalid: - " + error;
+						sip = null;
+						valid = false;
+					}
+					Ipv4Address sipMask = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getSrcIpMask");
+					if (error == null) {
+						sipMask = extClassifier.getSrcIpMask();
+						count++;
+					} else {
+						message += " ext-classifier.srcIpMask invalid: - " + error;
+						sipMask = null;
+						valid = false;
+					}
+					if (sip != null && sipMask == null) {
+						message += " ext-classifier.srcIpMask missing";
+						valid = false;
+					}
+					Ipv4Address dip = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getDstIp");
+					if (error == null) {
+						dip = extClassifier.getDstIp();
+						count++;
+					} else {
+						message += " ext-classifier.dstIp invalid: - " + error;
+						dip = null;
+						valid = false;
+					}
+					Ipv4Address dipMask = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getDstIpMask");
+					if (error == null) {
+						dipMask = extClassifier.getDstIpMask();
+						count++;
+					} else {
+						message += " ext-classifier.srcIpMask invalid: - " + error;
+						dipMask = null;
+						valid = false;
+					}
+					if (dip != null && dipMask == null) {
+						message += " ext-classifier.dstIpMask missing;";
+						valid = false;
+					}
+					TpProtocol proto = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getProtocol");
+					if (error == null) {
+						proto = extClassifier.getProtocol();
+						count++;
+					} else {
+						message += " ext-classifier.protocol invalid: - " + error;
+						proto = null;
+						valid = false;
+					}
+					PortNumber sportStart = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getSrcPortStart");
+					if (error == null) {
+						sportStart = extClassifier.getSrcPortStart();
+						count++;
+					} else {
+						message += " ext-classifier.srcPortStart invalid: - " + error;
+						sportStart = null;
+						valid = false;
+					}
+					PortNumber sportEnd = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getSrcPortEnd");
+					if (error == null) {
+						sportEnd = extClassifier.getSrcPortEnd();
+						count++;
+					} else {
+						message += " ext-classifier.srcPortEnd invalid: - " + error;
+						sportEnd = null;
+						valid = false;
+					}
+					if (sportStart != null && sportEnd != null) {
+						if (sportStart.getValue() > sportEnd.getValue()) {
+							message += " ext-classifier.srcPortStart greater than srcPortEnd";
+							valid = false;
+						}
+					}
+					PortNumber dportStart = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getDstPortStart");
+					if (error == null) {
+						dportStart = extClassifier.getDstPortStart();
+						count++;
+					} else {
+						message += " ext-classifier.dstPortStart invalid: - " + error;
+						dportStart = null;
+						valid = false;
+					}
+					PortNumber dportEnd = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getDstPortEnd");
+					if (error == null) {
+						dportEnd = extClassifier.getDstPortEnd();
+						count++;
+					} else {
+						message += " ext-classifier.dstPortEnd invalid: - " + error;
+						dportEnd = null;
+						valid = false;
+					}
+					if (dportStart != null && dportEnd != null) {
+						if (dportStart.getValue() > dportEnd.getValue()) {
+							message += " ext-classifier.dstPortStart greater than dstPortEnd";
+							valid = false;
+						}
+					}
+					TosByte tosByte = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getTosByte");
+					if (error == null) {
+						tosByte = extClassifier.getTosByte();
+						count++;
+					} else {
+						message += " ext-classifier.tosByte invalid: " + error;
+						tosByte = null;
+						valid = false;
+					}
+					TosByte tosMask = null;
+					error = validateMethod(ExtClassifier.class, extClassifier, "getTosMask");
+					if (error == null) {
+						tosMask = extClassifier.getTosMask();
+						if (tosByte != null && tosMask == null) {
+							message += " ext-classifier.tosMask missing;";
+							valid = false;
+						}
+					} else {
+						message += " ext-classifier.tosMask invalid: " + error;
+						tosMask = null;
+						valid = false;
+					}
+					if (count == 0) {
+						message += " ext-classifer must have at least one match field";
+						valid = false;
+					}
+					if (! valid) {
+						ExtClassifierBuilder cBuilder = new ExtClassifierBuilder();
+						cBuilder.setSrcIp(sip);
+						cBuilder.setSrcIpMask(sipMask);
+						cBuilder.setDstIp(dip);
+						cBuilder.setDstIpMask(dipMask);
+						cBuilder.setProtocol(proto);
+						cBuilder.setSrcPortStart(sportStart);
+						cBuilder.setSrcPortEnd(sportEnd);
+						cBuilder.setDstPortStart(dportStart);
+						cBuilder.setDstPortEnd(dportEnd);;
+						cBuilder.setTosByte(tosByte);
+						cBuilder.setTosMask(tosMask);
+						extClassifier = cBuilder.build();
+						rebuild = true;
+					}
+				} else if (ipv6Classifier != null) {
+					// validate ipv6-classifier
+					count = 0;
+					Ipv6Prefix sip6 = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getSrcIp6");
+					if (error == null) {
+						sip6 = ipv6Classifier.getSrcIp6();
+						count++;
+					} else {
+						message += " ipv6-classifier.srcIp invalid: - " + error;
+						sip6 = null;
+						valid = false;
+					}
+					Ipv6Prefix dip6 = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getDstIp6");
+					if (error == null) {
+						dip6 = ipv6Classifier.getDstIp6();
+						count++;
+					} else {
+						message += " ipv6-classifier.dstIp invalid: - " + error;
+						dip6 = null;
+						valid = false;
+					}
+					Long flowLabel = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getFlowLabel");
+					if (error == null) {
+						flowLabel = ipv6Classifier.getFlowLabel();
+						if (flowLabel > 1048575) {
+							message += " ipv6-classifier.flowLabel invalid: - must be 0..1048575";
+							flowLabel = null;
+							valid = false;
+						} else {
+							count++;
+						}
+					} else {
+						message += " ipv6-classifier.flowLabel invalid: - " + error;
+						flowLabel = null;
+						valid = false;
+					}
+					TpProtocol nxtHdr = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getNextHdr");
+					if (error == null) {
+						nxtHdr = ipv6Classifier.getNextHdr();
+						count++;
+					} else {
+						message += " ipv6-classifier.nextHdr invalid: - " + error;
+						nxtHdr = null;
+						valid = false;
+					}
+					PortNumber sportStart = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getSrcPortStart");
+					if (error == null) {
+						sportStart = ipv6Classifier.getSrcPortStart();
+						count++;
+					} else {
+						message += " ipv6-classifier.srcPortStart invalid: - " + error;
+						sportStart = null;
+						valid = false;
+					}
+					PortNumber sportEnd = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getSrcPortEnd");
+					if (error == null) {
+						sportEnd = ipv6Classifier.getSrcPortEnd();
+						count++;
+					} else {
+						message += " ipv6-classifier.srcPortEnd invalid: - " + error;
+						sportEnd = null;
+						valid = false;
+					}
+					if (sportStart != null && sportEnd != null) {
+						if (sportStart.getValue() > sportEnd.getValue()) {
+							message += " ipv6-classifier.srcPortStart greater than srcPortEnd";
+							valid = false;
+						}
+					}
+					PortNumber dportStart = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getDstPortStart");
+					if (error == null) {
+						dportStart = ipv6Classifier.getDstPortStart();
+						count++;
+					} else {
+						message += " ipv6-classifier.dstPortStart invalid: - " + error;
+						dportStart = null;
+						valid = false;
+					}
+					PortNumber dportEnd = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getDstPortEnd");
+					if (error == null) {
+						dportEnd = ipv6Classifier.getDstPortEnd();
+						count++;
+					} else {
+						message += " ipv6-classifier.dstPortEnd invalid: - " + error;
+						dportEnd = null;
+						valid = false;
+					}
+					if (dportStart != null && dportEnd != null) {
+						if (dportStart.getValue() > dportEnd.getValue()) {
+							message += " ipv6-classifier.dstPortStart greater than dstPortEnd";
+							valid = false;
+						}
+					}
+					TosByte tcLow = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getTcLow");
+					if (error == null) {
+						tcLow = ipv6Classifier.getTcLow();
+						count++;
+					} else {
+						message += " ipv6-classifier.tc-low invalid: " + error;
+						tcLow = null;
+						valid = false;
+					}
+					TosByte tcHigh = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getTcHigh");
+					if (error == null) {
+						tcHigh = ipv6Classifier.getTcHigh();
+						count++;
+					} else {
+						message += " ipv6-classifier.tc-high invalid: " + error;
+						tcHigh = null;
+						valid = false;
+					}
+					if (tcLow != null && tcHigh != null) {
+						if (tcLow.getValue() > tcHigh.getValue()) {
+							message += " ipv6-classifier.tc-low is greater than tc-high";
+							valid = false;
+						}
+					}
+					TosByte tcMask = null;
+					error = validateMethod(Ipv6Classifier.class, ipv6Classifier, "getTcMask");
+					if (error == null) {
+						tcMask = ipv6Classifier.getTcMask();
+					} else {
+						message += " ipv6-classifier.tc-mask invalid: " + error;
+						tcMask = null;
+						valid = false;
+					}
+					if (tcLow != null && tcHigh != null && tcMask == null) {
+						message += " ipv6-classifier.tc-mask missing;";
+						valid = false;
+					}
+					if (count == 0) {
+						message += " ipv6-classifer must have at least one match field";
+						valid = false;
+					}
+					if (! valid) {
+						Ipv6ClassifierBuilder cBuilder = new Ipv6ClassifierBuilder();
+						cBuilder.setSrcIp6(sip6);
+						cBuilder.setDstIp6(dip6);
+						cBuilder.setFlowLabel(flowLabel);
+						cBuilder.setNextHdr(nxtHdr);
+						cBuilder.setSrcPortStart(sportStart);
+						cBuilder.setSrcPortEnd(sportEnd);
+						cBuilder.setDstPortStart(dportStart);
+						cBuilder.setDstPortEnd(dportEnd);;
+						cBuilder.setTcLow(tcLow);
+						cBuilder.setTcHigh(tcHigh);
+						cBuilder.setTcMask(tcMask);
+						ipv6Classifier = cBuilder.build();
+						rebuild = true;
+					}
+				}
+			}
+			// rebuild the gate object with valid data and set the response
+			if (rebuild) {
+				GatesBuilder builder = new GatesBuilder();
+				builder.setGateId(gate.getGateId());
+				builder.setKey(gate.getKey());
+				builder.setGateSpec(gateSpec);
+				builder.setTrafficProfile(profile);
+				if (classifier != null) {
+					builder.setClassifier(classifier);
+				} else if (extClassifier != null) {
+					builder.setExtClassifier(extClassifier);
+				} else if (ipv6Classifier != null) {
+					builder.setIpv6Classifier(ipv6Classifier);
+				}
+				gate = builder.build();
+				response.gateBase = gate;
+				response.message += message;
+			}
+			return (! rebuild);
+		}
+
 		private boolean validateCcap(Ccaps ccap, Response response) {
 			// validate ccap and null out invalid elements as we go
 			String message = "";
@@ -791,7 +1333,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					valid = false;
 				}
 				if (! valid) {
-					AmIdBuilder amIdBuilder = new AmIdBuilder(amId);
+					AmIdBuilder amIdBuilder = new AmIdBuilder();
 					amIdBuilder.setAmTag(amTag);
 					amIdBuilder.setAmType(amType);
 					amId = amIdBuilder.build();
@@ -896,7 +1438,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			return (! rebuild);
 		}
-
 
 
 

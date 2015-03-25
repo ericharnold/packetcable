@@ -47,6 +47,9 @@ import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Qos;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmId;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.AmIdBuilder;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.Connection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ccap.attributes.ConnectionBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.classifier.Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.Apps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.AppsKey;
@@ -649,29 +652,60 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private class validateInstanceData {
+	private class ValidateInstanceData {
 
-		private String message = null;
 		// CCAP Identity
 		public Ccaps ccap;
 		public InstanceIdentifier<Ccaps> ccapIID;
 		// Gate Identities
 		public Map<InstanceIdentifier<Gates>, Gates> gateIidMap = new HashMap<InstanceIdentifier<Gates>, Gates>();
 
-		public validateInstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
+		public ValidateInstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			getCcap(thisData);
 			if (ccap == null) {
 				getGates(thisData);
 			}
 		}
 		public boolean isResponseEcho() {
-			// see if there is a response object in the updated data -- if so our caller can exit right away
+			// see if there is a response object in the updated data
+			// if so this is an echo of the response message insertion so our caller can exit right away
 			if (ccap != null && ccap.getResponse() != null) {
 				return true;
 			} else if (! gateIidMap.isEmpty() && gateIidMap.values().iterator().next().getResponse() != null) {
 				return true;
 			}
 			return false;
+		}
+		public boolean validateYang() {
+			String message = "";
+			boolean valid = true;
+			if (isResponseEcho()) {
+				// don't validiate the echo again
+				return valid;
+			}
+			if (ccap != null) {
+				message = "400 Bad Request - Invalid Element Value in json object - ";
+				Response response = new Response(ccapIID, ccap, message);
+				if (! validateCcap(ccap, response)) {
+					logger.error(response.message);
+					executor.execute(response);
+					valid = false;
+				}
+			} else if (! gateIidMap.isEmpty()) {
+				for (Map.Entry<InstanceIdentifier<Gates>, Gates> entry : gateIidMap.entrySet()) {
+					InstanceIdentifier<Gates> gateIID = entry.getKey();
+					Gates gate = entry.getValue();
+					message = validateYangObject(gate);
+					if (message != "") {
+						message = "400 Bad Request - Invalid Element Value in json object - " + message;
+						// set the response string in the config gate object using a new thread
+						Response response = new Response(gateIID, gate, message);
+						executor.execute(response);
+						valid = false;
+					}
+				}
+			}
+			return valid;
 		}
 		private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
@@ -690,9 +724,186 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				}
 		    }
 		}
-		private String validateYang(Object obj) {
-			// recursively look for bad yang values
-			String message = null;
+		private String validateMethod(Class thisClass, Object thisObj, String methodName) {
+			String error = null;
+			try {
+				Method method = thisClass.getMethod(methodName);
+				Object result = method.invoke(thisObj);
+			} catch (IllegalArgumentException e) {
+				error = e.getMessage();
+				return error;
+			} catch (Exception e) {
+				error = String.format("%s.%s(): Method failed: %s ", thisClass.getSimpleName(), methodName, e.getMessage());
+				return error;
+			}
+			return error;
+
+		}
+		private String validateObj(Object obj) {
+			String error = null;
+			try {
+				obj.toString();
+			} catch (IllegalArgumentException e) {
+				error = e.getMessage();
+				return error;
+			} catch (Exception e) {
+				error = "toString() failed: " + e.getMessage();
+				return error;
+			}
+			return error;
+		}
+		private boolean validateCcap(Ccaps ccap, Response response) {
+			// validate ccap and null out invalid elements as we go
+			String message = "";
+			String error = null;
+			boolean valid = true;
+			boolean rebuild = false;
+			// amId
+			AmId amId = ccap.getAmId();
+			if (amId == null) {
+				message += " amId is required;";
+				rebuild = true;
+			} else {
+				Integer amTag = null;
+				error = validateMethod(AmId.class, amId, "getAmTag");
+				if (error == null) {
+					amTag = amId.getAmTag();
+					if (amTag == null) {
+						message += " amId.amTag missing;";
+						valid = false;
+					}
+				} else {
+					message += " amId.amTag invalid: " + error;
+					amTag = null;
+					valid = false;
+				}
+				Integer amType = null;
+				error = validateMethod(AmId.class, amId, "getAmType");
+				if (error == null) {
+					amType = amId.getAmType();
+					if (amType == null) {
+						message += " amId.amType missing;";
+						valid = false;
+					}
+				} else {
+					message += " amId.amType invalid: " + error;
+					amType = null;
+					valid = false;
+				}
+				if (! valid) {
+					AmIdBuilder amIdBuilder = new AmIdBuilder(amId);
+					amIdBuilder.setAmTag(amTag);
+					amIdBuilder.setAmType(amType);
+					amId = amIdBuilder.build();
+					rebuild = true;
+				}
+			}
+			// connection
+			error = null;
+			valid = true;
+			Connection conn = ccap.getConnection();
+			if (conn == null) {
+				message += " connection is required;";
+				rebuild = true;
+			} else {
+				IpAddress ipAddress = null;
+				error = validateMethod(Connection.class, conn, "getIpAddress");
+				if (error == null) {
+					ipAddress = conn.getIpAddress();
+					if (ipAddress == null) {
+						message += " connection.ipAddress missing;";
+						valid = false;
+					}
+				} else {
+					message += " connection.ipAddress invalid: " + error;
+					ipAddress = null;
+					valid = false;
+				}
+				PortNumber portNum = null;
+				error = validateMethod(Connection.class, conn, "getPort");
+				if (error == null) {
+					portNum = conn.getPort();
+				} else {
+					message += " connection.port invalid: " + error;
+					portNum = null;
+					valid = false;
+				}
+				if (! valid) {
+					ConnectionBuilder connBuilder = new ConnectionBuilder();
+					connBuilder.setIpAddress(ipAddress);
+					connBuilder.setPort(portNum);
+					conn = connBuilder.build();
+					rebuild = true;
+				}
+			}
+			// subscriber-subnets
+			error = null;
+			valid = true;
+			List<IpPrefix> subnets = null;
+			error = validateMethod(Ccaps.class, ccap, "getSubscriberSubnets");
+			if (error == null) {
+				subnets = ccap.getSubscriberSubnets();
+				if (subnets == null) {
+					message += " subscriber-subnets is required;";
+					rebuild = true;
+				}
+			} else {
+				message += " subscriber-subnets contains invalid IpPrefix - must be <ipaddress>/<prefixlen> format;" + error;
+				rebuild = true;
+			}
+			// upstream-scns and downstream-scns
+			error = null;
+			valid = true;
+			List<ServiceClassName> usScns = null;
+			error = validateMethod(Ccaps.class, ccap, "getUpstreamScns");
+			if (error == null) {
+				usScns = ccap.getUpstreamScns();
+				if (usScns == null) {
+					message += " upstream-scns is required;";
+					rebuild = true;
+				}
+			} else {
+				message += " upstream-scns contains invalid SCN - must be 2-16 characters;" + error;
+				rebuild = true;
+			}
+			error = null;
+			valid = true;
+			List<ServiceClassName> dsScns = null;
+			error = validateMethod(Ccaps.class, ccap, "getDownstreamScns");
+			if (error == null) {
+				usScns = ccap.getDownstreamScns();
+				if (usScns == null) {
+					message += " downstream-scns is required;";
+					rebuild = true;
+				}
+			} else {
+				message += " downstream-scns contains invalid SCN - must be 2-16 characters;" + error;
+				rebuild = true;
+			}
+			// rebuild the ccap object with valid data and set the response
+			if (rebuild) {
+				CcapsBuilder builder = new CcapsBuilder();
+				builder.setCcapId(ccap.getCcapId());
+				builder.setKey(ccap.getKey());
+				builder.setAmId(amId);
+				builder.setConnection(conn);
+				builder.setSubscriberSubnets(subnets);
+				builder.setUpstreamScns(usScns);
+				builder.setDownstreamScns(dsScns);
+				ccap = builder.build();
+				response.ccapBase = ccap;
+				response.message += message;
+			}
+			return (! rebuild);
+		}
+
+
+
+
+
+		private String validateYangObject(Object obj) {
+			// recursively look for bad yang values and return a message string with clues
+			String message = "";
 			Method[] methods = obj.getClass().getDeclaredMethods();
 			for (int i = 0; i < methods.length; i++) {
 				String name = methods[i].getName();
@@ -701,7 +912,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					if (methods[i].getReturnType() == List.class) {
 						List objList = (List) methods[i].invoke(obj);
 						for (Object thisObj : objList) {
-							String result = validateYang(thisObj);
+							String result = validateYangObject(thisObj);
 							if (result != null) {
 								message += name + ":[" + result + "]";
 							}
@@ -711,15 +922,12 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 						methods[i].invoke(obj).toString();
 					}
 				} catch (Exception err) {
-					message += String.format("%s ", name);
+					message += String.format(" %s", name);
 				}
 			}
 			return message;
 		}
-
 	}
-
-
 
 	private enum ChangeAction {created, updated, removed};
 
@@ -729,39 +937,39 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		Map<InstanceIdentifier<?>, DataObject> updatedData = change.getUpdatedData();
 		Map<InstanceIdentifier<?>, DataObject> originalData = change.getOriginalData();
 		Set<InstanceIdentifier<?>> removedData = change.getRemovedPaths();
-		DataObject originalSubtree = change.getOriginalSubtree();
-		DataObject updatedSubtree = change.getUpdatedSubtree();
-
-		String validationMessage = null;
-		try {
-			// this will also validate all the values passed in the tree
-			logger.debug("onDataChanged().createdData: " + createdData);
-			logger.debug("onDataChanged().updatedData: " + updatedData);
-			logger.debug("onDataChanged().originalData: " + originalData);
-			logger.debug("onDataChanged().removedData: " + removedData);
-			logger.debug("onDataChanged().originalSubtree: " + originalSubtree);
-			logger.debug("onDataChanged().updatedSubtree: " + updatedSubtree);
-		} catch (IllegalArgumentException | IllegalStateException err) {
-			logger.error("onDataChanged().change: Illegal Element Value in json object: " + err);
-			validationMessage = "400 Bad Request - Illegal Element Value in json object - ";
-		}
 
 		// Determine what change action took place by looking at the change object's InstanceIdentifier sets
-		ChangeAction changeAction = null;
+		ValidateInstanceData validator = null;
 		InstanceData thisData = null;
+		ChangeAction changeAction = null;
 		if (! createdData.isEmpty()) {
+			validator = new ValidateInstanceData(createdData);
+			if (! validator.validateYang()) {
+				// leave now -- a bad yang object has been detected and a response object has been inserted
+				return;
+			}
 			changeAction = ChangeAction.created;
 			thisData = new InstanceData(createdData);
+			logger.debug("onDataChanged().createdData: " + createdData);
 		} else if (! removedData.isEmpty()) {
 			changeAction = ChangeAction.removed;
 			thisData = new InstanceData(removedData);
+			logger.debug("onDataChanged().removedData: " + removedData);
+//			logger.debug("onDataChanged().originalData: " + originalData);
 		} else if (! updatedData.isEmpty()) {
-				changeAction = ChangeAction.updated;
-				thisData = new InstanceData(updatedData);
-		} else {
-				// we should not be here -- complain bitterly and return
-				logger.error("onDataChanged(): Unknown change action: " + change);
+			validator = new ValidateInstanceData(updatedData);
+			if (validator.isResponseEcho()) {
+				// leave now -- this is an echo of the inserted response object
 				return;
+			}
+			changeAction = ChangeAction.updated;
+			thisData = new InstanceData(updatedData);
+			logger.debug("onDataChanged().updatedData: " + updatedData);
+			logger.debug("onDataChanged().originalData: " + originalData);
+		} else {
+			// we should not be here -- complain bitterly and return
+			logger.error("onDataChanged(): Unknown change action: " + change);
+			return;
 		}
 
 		// select the change action
@@ -774,26 +982,17 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		case created:
 			// get the CMTS parameters from the CmtsNode in the Map entry (if new CMTS)
 			thisCcap = thisData.ccap;
-			if (validationMessage != null) {
-
-			}
-
 			String message = null;
 			if (thisCcap != null) {
-				if (validationMessage == null) {
-					// get the CMTS node identity from the Instance Data
-					ccapId = thisData.ccapId;
-					message = pcmmService.addCcap(thisCcap);
-					if (message.contains("200 OK")) {
-						ccapMap.put(ccapId, thisCcap);
-						updateCcapMaps(thisCcap);
-						logger.info("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
-					} else {
-						logger.error("onDataChanged(): create CCAP Failed: {}/{} : {}", thisData.gatePath, thisCcap, message);
-					}
+				// get the CMTS node identity from the Instance Data
+				ccapId = thisData.ccapId;
+				message = pcmmService.addCcap(thisCcap);
+				if (message.contains("200 OK")) {
+					ccapMap.put(ccapId, thisCcap);
+					updateCcapMaps(thisCcap);
+					logger.info("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
 				} else {
-					// there is something wrong in the ccap json input -- try to find where the problem is
-//					message = validateYang(thisCcap);
+					logger.error("onDataChanged(): create CCAP Failed: {}/{} : {}", thisData.gatePath, thisCcap, message);
 				}
 				// set the response string in the config ccap object using a new thread
 				Response response = new Response(thisData.ccapIID, thisCcap, message);
@@ -836,10 +1035,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		case updated:
 			thisCcap = thisData.ccap;
 			if (thisCcap != null) {
-				if (thisCcap.getResponse() != null) {
-					// this is an echo from setting the response message into the ccap object
-					return;
-				}
 				// get the CMTS node identity from the Instance Data
 				ccapId = thisData.ccapId;
 				lastCcap = ccapMap.get(ccapId);
@@ -851,10 +1046,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				pcmmService.addCcap(thisCcap);
 			} else {
 				for (Gates gate : thisData.gateIidMap.values()) {
-					if (gate.getResponse() != null) {
-						// this is an echo from setting the response message into the gate object
-						continue;
-					}
 					String gateId = gate.getGateId();
 					String gatePathStr = thisData.gatePath + "/" + gateId ;
 					lastGate = gateMap.get(gatePathStr);

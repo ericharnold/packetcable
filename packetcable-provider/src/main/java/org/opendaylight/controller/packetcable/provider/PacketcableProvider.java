@@ -120,12 +120,12 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	public static final InstanceIdentifier<Ccaps> ccapsIID = InstanceIdentifier.builder(Ccaps.class).build();
 	public static final InstanceIdentifier<Qos> qosIID = InstanceIdentifier.builder(Qos.class).build();
 
+	private DataBroker dataBroker;
 	private final ExecutorService executor;
 
 	// The following holds the Future for the current make toast task.
 	// This is used to cancel the current toast.
 	private final AtomicReference<Future<?>> currentConnectionsTasks = new AtomicReference<>();
-	private DataBroker dataBroker;
 	private ListenerRegistration<DataChangeListener> listenerRegistration;
 	private List<InstanceIdentifier<?>> cmtsInstances = Lists.newArrayList();
 
@@ -234,7 +234,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private Ccaps getSubscriberSubnetsLPM(IpAddress ipAddress) {
+	private Ccaps findCcapForSubscriberId(IpAddress ipAddress) {
 		String ipAddressStr = getIpAddressStr(ipAddress);
 		InetAddress inetAddr = null;
 		try {
@@ -615,7 +615,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private class Response implements Runnable {
+	private class ResponseXXX implements Runnable {
 
 		private String message = null;
 		private InstanceIdentifier<Ccaps> ccapIID = null;
@@ -623,12 +623,12 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		private InstanceIdentifier<Gates> gateIID = null;
 		private Gates gateBase = null;
 
-		public Response(InstanceIdentifier<Ccaps> ccapIID, Ccaps ccapBase, String message) {
+		public ResponseXXX(InstanceIdentifier<Ccaps> ccapIID, Ccaps ccapBase, String message) {
 			this.ccapIID = ccapIID;
 			this.ccapBase = ccapBase;
 			this.message = message;
 		}
-		public Response(InstanceIdentifier<Gates> gateIID, Gates gateBase, String message) {
+		public ResponseXXX(InstanceIdentifier<Gates> gateIID, Gates gateBase, String message) {
 			this.gateIID = gateIID;
 			this.gateBase = gateBase;
 			this.message = message;
@@ -663,7 +663,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private class ValidateInstanceData {
+	private class ValidateInstanceDataXXX {
 
 		// CCAP Identity
 		public Ccaps ccap;
@@ -671,7 +671,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		// Gate Identities
 		public Map<InstanceIdentifier<Gates>, Gates> gateIidMap = new HashMap<InstanceIdentifier<Gates>, Gates>();
 
-		public ValidateInstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
+		public ValidateInstanceDataXXX(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			getCcap(thisData);
 			if (ccap == null) {
 				getGates(thisData);
@@ -696,9 +696,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			if (ccap != null) {
 				message = "400 Bad Request - Invalid Element Values in json object - ";
-				Response response = new Response(ccapIID, ccap, message);
+				Response response = new Response(dataBroker, ccapIID, ccap, message);
 				if (! validateCcap(ccap, response)) {
-					logger.error("Validate CCAP {} failed - {}", ccap.getCcapId(), response.message);
+					logger.error("Validate CCAP {} failed - {}", ccap.getCcapId(), response.getMessage());
 					executor.execute(response);
 					valid = false;
 				}
@@ -707,9 +707,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					InstanceIdentifier<Gates> gateIID = entry.getKey();
 					Gates gate = entry.getValue();
 					message = "400 Bad Request - Invalid Element Values in json object - ";
-					Response response = new Response(gateIID, gate, message);
+					Response response = new Response(dataBroker, gateIID, gate, message);
 					if (! validateGate(gate, response)) {
-						logger.error("Validate Gate {} failed - {}", gate.getGateId(), response.message);
+						logger.error("Validate Gate {} failed - {}", gate.getGateId(), response.getMessage());
 						executor.execute(response);
 						valid = false;
 					}
@@ -1288,8 +1288,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					builder.setIpv6Classifier(ipv6Classifier);
 				}
 				gate = builder.build();
-				response.gateBase = gate;
-				response.message += message;
+				response.setGateBase(gate);
+				response.addMessage(message);
 			}
 			return (! rebuild);
 		}
@@ -1433,8 +1433,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				builder.setUpstreamScns(usScns);
 				builder.setDownstreamScns(dsScns);
 				ccap = builder.build();
-				response.ccapBase = ccap;
-				response.message += message;
+				response.setCcapBase(ccap);
+				response.addMessage(message);
 			}
 			return (! rebuild);
 		}
@@ -1484,7 +1484,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		InstanceData thisData = null;
 		ChangeAction changeAction = null;
 		if (! createdData.isEmpty()) {
-			validator = new ValidateInstanceData(createdData);
+			validator = new ValidateInstanceData(dataBroker, createdData);
 			if (! validator.validateYang()) {
 				// leave now -- a bad yang object has been detected and a response object has been inserted
 				return;
@@ -1498,7 +1498,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			logger.debug("onDataChanged().removedData: " + removedData);
 //			logger.debug("onDataChanged().originalData: " + originalData);
 		} else if (! updatedData.isEmpty()) {
-			validator = new ValidateInstanceData(updatedData);
+			validator = new ValidateInstanceData(dataBroker, updatedData);
 			if (validator.isResponseEcho()) {
 				// leave now -- this is an echo of the inserted response object
 				return;
@@ -1536,7 +1536,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					logger.error("onDataChanged(): create CCAP Failed: {}/{} : {}", thisData.gatePath, thisCcap, message);
 				}
 				// set the response string in the config ccap object using a new thread
-				Response response = new Response(thisData.ccapIID, thisCcap, message);
+				Response response = new Response(dataBroker, thisData.ccapIID, thisCcap, message);
 				executor.execute(response);
 			} else {
 				// get the PCMM gate parameters from the cmtsId/appId/subId/gateId path in the Maps entry (if new gate)
@@ -1546,7 +1546,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					String gateId = gate.getGateId();
 					String gatePathStr = thisData.gatePath + "/" + gateId ;
 					IpAddress subId = thisData.subId;
-					thisCcap = getSubscriberSubnetsLPM(subId);
+					thisCcap = findCcapForSubscriberId(subId);
 					message = null;
 					if (thisCcap != null) {
 						ccapId = thisCcap.getCcapId();
@@ -1574,7 +1574,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 								gateId, subIdStr, gatePathStr);
 					}
 					// set the response message in the config gate object using a new thread
-					Response response = new Response(gateIID, gate, message);
+					Response response = new Response(dataBroker, gateIID, gate, message);
 					executor.execute(response);
 				}
 			}

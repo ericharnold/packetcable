@@ -296,7 +296,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
         	if (portNum != null) {
         		port = portNum.getValue();
         	}
-            logger.info("CcapClient: connect(): {}:{}", ipv4, port);
+            logger.debug("CcapClient: connect(): {}:{}", ipv4, port);
             try  {
                 pcmmPdp.connect(ipv4, port);
                 isConnected = true;
@@ -308,7 +308,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
         }
 
         public void disconnect() {
-            logger.info("CcapClient: disconnect(): {}:{}", ipv4, port);
+            logger.debug("CcapClient: disconnect(): {}:{}", ipv4, port);
         	try {
 				pcmmPdp.disconnect(pcmmPdp.getPepIdString(), null);
 				isConnected = false;
@@ -318,7 +318,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
         }
 
         public Boolean sendGateSet(PCMMGateReq gateReq) {
-            logger.info("CcapClient: sendGateSet(): {}:{} => {}", ipv4, port, gateReq);
+            logger.debug("CcapClient: sendGateSet(): {}:{} => {}", ipv4, port, gateReq);
         	try {
                 pcmmSender = new PCMMPdpMsgSender(PCMMDef.C_PCMM, pcmmPdp.getClientHandle(), pcmmPdp.getSocket());
 				pcmmSender.sendGateSet(gateReq);
@@ -331,7 +331,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
         }
 
         public Boolean sendGateDelete(PCMMGateReq gateReq) {
-            logger.info("CcapClient: sendGateDelete(): {}:{} => {}", ipv4, port, gateReq);
+            logger.debug("CcapClient: sendGateDelete(): {}:{} => {}", ipv4, port, gateReq);
         	try {
                 pcmmSender = new PCMMPdpMsgSender(PCMMDef.C_PCMM, pcmmPdp.getClientHandle(), pcmmPdp.getSocket());
 				pcmmSender.sendGateDelete(gateReq);
@@ -477,7 +477,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					if (gateReq.getGateID() != null) {
 						logger.info(String.format("PCMMService: sendGateDelete(): deleted GateId %08x: ", gateReq.getGateID().getGateID()));
 					} else {
-						logger.info("PCMMService: sendGateDelete(): deleted but no gateId returned");
+						logger.error("PCMMService: sendGateDelete(): deleted but no gateId returned");
 					}
 					return true;
 				}
@@ -640,7 +640,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	        WriteTransaction writeTx = dataBroker.newWriteOnlyTransaction();
 	        writeTx.merge(LogicalDatastoreType.CONFIGURATION, ccapIID, ccap, true);
 	        writeTx.commit();
-	        logger.info("Response.setResponse(ccap) complete {} {} {}", message, ccap, ccapIID);
+	        logger.debug("Response.setResponse(ccap) complete {} {} {}", message, ccap, ccapIID);
 		}
 		public void setResponse(InstanceIdentifier<Gates> gateIID, Gates gateBase, String message) {
 			GatesBuilder gateBuilder = new GatesBuilder(gateBase);
@@ -649,7 +649,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	        WriteTransaction writeTx = dataBroker.newWriteOnlyTransaction();
 	        writeTx.merge(LogicalDatastoreType.CONFIGURATION, gateIID, gate, true);
 	        writeTx.commit();
-	        logger.info("Response.setResponse(gate) complete: {} {} {}", message, gate, gateIID);
+	        logger.debug("Response.setResponse(gate) complete: {} {} {}", message, gate, gateIID);
 		}
 		@Override
 		public void run() {
@@ -1531,7 +1531,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				if (message.contains("200 OK")) {
 					ccapMap.put(ccapId, thisCcap);
 					updateCcapMaps(thisCcap);
-					logger.info("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
+					logger.debug("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
 				} else {
 					logger.error("onDataChanged(): create CCAP Failed: {}/{} : {}", thisData.gatePath, thisCcap, message);
 				}
@@ -1554,18 +1554,24 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 						if (message.contains("200 OK")) {
 							gateMap.put(gatePathStr, gate);
 							gateCcapMap.put(gatePathStr, thisCcap);
-							logger.info("onDataChanged(): created QoS gate {} for {}/{}/{} - {}",
+							logger.debug("onDataChanged(): created QoS gate {} for {}/{}/{} - {}",
 									gateId, ccapId, gatePathStr, gate, message);
+							logger.info("onDataChanged(): created QoS gate {} for {}/{} - {}",
+									gateId, ccapId, gatePathStr, message);
 						} else {
-							logger.error("onDataChanged(): Unable to create QoS gate {} for {}/{}/{} - {}",
+							logger.debug("onDataChanged(): Unable to create QoS gate {} for {}/{}/{} - {}",
 									gateId, ccapId, gatePathStr, gate, message);
+							logger.error("onDataChanged(): Unable to create QoS gate {} for {}/{} - {}",
+									gateId, ccapId, gatePathStr, message);
 						}
 					} else {
 						String subIdStr = thisData.gatePathMap.get("subId");
 						message = String.format("404 Not Found - no CCAP found for subscriber %s in %s",
 								subIdStr, gatePathStr);
-						logger.error("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}/{}",
+						logger.debug("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}/{}",
 								gateId, subIdStr, gatePathStr, gate);
+						logger.error("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}",
+								gateId, subIdStr, gatePathStr);
 					}
 					// set the response message in the config gate object using a new thread
 					Response response = new Response(gateIID, gate, message);
@@ -1579,7 +1585,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				// get the CMTS node identity from the Instance Data
 				ccapId = thisData.ccapId;
 				lastCcap = ccapMap.get(ccapId);
-				logger.info("onDataChanged(): updated CCAP " + ccapId + ": FROM: " + lastCcap + " TO: " + thisCcap);
+				logger.debug("onDataChanged(): updated CCAP " + ccapId + ": FROM: " + lastCcap + " TO: " + thisCcap);
 				ccapMap.put(ccapId, thisCcap);
 				// remove original cmtsNode
 				pcmmService.removeCcap(lastCcap);
@@ -1590,7 +1596,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					String gateId = gate.getGateId();
 					String gatePathStr = thisData.gatePath + "/" + gateId ;
 					lastGate = gateMap.get(gatePathStr);
-					logger.info("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
+					logger.debug("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
 				}
 			}
 			break;
@@ -1603,14 +1609,16 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					thisCcap = gateCcapMap.remove(gatePathStr);
 					ccapId = thisCcap.getCcapId();
 					pcmmService.sendGateDelete(thisCcap, gatePathStr);
-					logger.info("onDataChanged(): removed QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, thisGate);
+					logger.debug("onDataChanged(): removed QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, thisGate);
+					logger.info("onDataChanged(): removed QoS gate {} for {}/{}: ", gateId, ccapId, gatePathStr);
 				}
 			}
 			for (String ccapIdStr: thisData.removePathList) {
 				if (ccapMap.containsKey(ccapIdStr)) {
 					thisCcap = ccapMap.remove(ccapIdStr);
 					pcmmService.removeCcap(thisCcap);
-					logger.info("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
+					logger.debug("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
+					logger.info("onDataChanged(): removed CCAP " + ccapIdStr);
 				}
 			}
 			break;

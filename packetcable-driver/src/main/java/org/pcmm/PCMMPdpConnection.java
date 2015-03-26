@@ -1,7 +1,7 @@
 /*
- 
+
  * Copyright (c) 2014 CableLabs.  All rights reserved.
- * 
+ *
  * This program and the accompanying materials are made available under the
  * terms of the Eclipse Public License v1.0 which accompanies this distribution,
  * and is available at http://www.eclipse.org/legal/epl-v10.html
@@ -16,6 +16,8 @@ import java.util.Date;
 import java.util.Enumeration;
 import java.util.Hashtable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.umu.cops.common.COPSDebug;
 import org.umu.cops.prpdp.COPSPdpException;
 import org.umu.cops.stack.COPSClientCloseMsg;
@@ -36,6 +38,8 @@ import org.umu.cops.stack.COPSTransceiver;
  * Class for managing an provisioning connection at the PDP side.
  */
 public class PCMMPdpConnection implements Runnable {
+
+	private static final Logger logger = LoggerFactory.getLogger(PCMMPdpConnection.class);
 
     /**
     Socket connected to PEP
@@ -250,7 +254,8 @@ public class PCMMPdpConnection implements Runnable {
 
             }
         } catch (Exception e) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_SOCKET, e);
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_SOCKET, e);
+            logger.error("{}: Socket Error - {}", getClass().getName(), e.getMessage());
         }
 
         // connection closed by server
@@ -321,8 +326,9 @@ public class PCMMPdpConnection implements Runnable {
         try {
             // Support
             if (cMsg.getIntegrity() != null) {
-                COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                              "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+            	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//                COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                              "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
             }
 
             conn.close();
@@ -356,8 +362,9 @@ public class PCMMPdpConnection implements Runnable {
         try {
             // Support
             if (cMsg.getIntegrity() != null) {
-                COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                              "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+            	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//                COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                              "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
             }
 
             kaMsg.writeData(conn);
@@ -386,8 +393,9 @@ public class PCMMPdpConnection implements Runnable {
 
         // Support
         if (cMsg.getIntegrity() != null) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+        	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
         }
 
         // Delete clientHandler
@@ -398,7 +406,8 @@ public class PCMMPdpConnection implements Runnable {
 
         PCMMPdpReqStateMan man = (PCMMPdpReqStateMan) _managerMap.get(cMsg.getClientHandle().getId().str());
         if (man == null) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOEXPECTEDMSG);
+        	logger.error("{}: Message not expected ", getClass().getName());
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOEXPECTEDMSG);
         } else {
             man.processDeleteRequestState(cMsg);
         }
@@ -432,8 +441,9 @@ public class PCMMPdpConnection implements Runnable {
 
         // Support
         if (reqMsg.getIntegrity() != null) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+        	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
         }
 
         PCMMPdpReqStateMan man;
@@ -476,8 +486,9 @@ public class PCMMPdpConnection implements Runnable {
 
         // Support
         if (repMsg.getIntegrity() != null) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+        	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
         }
 
         PCMMPdpReqStateMan man = (PCMMPdpReqStateMan) _managerMap.get(repMsg.getClientHandle().getId().str());
@@ -503,12 +514,14 @@ public class PCMMPdpConnection implements Runnable {
 
         // Support
         if (cMsg.getIntegrity() != null) {
-            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
-                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
+        	logger.error("{} Unsupported objects (Integrity) to connection - {}", getClass().getName(), conn.getInetAddress());
+//            COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOSUPPORTED,
+//                          "Unsupported objects (Integrity) to connection " + conn.getInetAddress());
         }
 
         PCMMPdpReqStateMan man = (PCMMPdpReqStateMan) _managerMap.get(cMsg.getClientHandle().getId().str());
         if (man == null) {
+        	logger.error("{}: Unexpected message", getClass().getName());
             COPSDebug.err(getClass().getName(), COPSDebug.ERROR_NOEXPECTEDMSG);
         } else {
             man.processSyncComplete(cMsg);

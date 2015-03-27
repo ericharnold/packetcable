@@ -446,8 +446,9 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					ccapMap.put(ccapId, thisCcap);
 					updateCcapMaps(thisCcap);
 					logger.debug("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
+					logger.info("onDataChanged(): created CCAP: {} : {}", thisData.gatePath, message);
 				} else {
-					logger.error("onDataChanged(): create CCAP Failed: {}/{} : {}", thisData.gatePath, thisCcap, message);
+					logger.error("onDataChanged(): create CCAP Failed: {} : {}", thisData.gatePath, message);
 				}
 				// set the response string in the config ccap object using a new thread
 				Response response = new Response(dataBroker, thisData.ccapIID, thisCcap, message);

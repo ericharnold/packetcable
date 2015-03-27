@@ -7,10 +7,10 @@ import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.Ccaps;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceClassName;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.ServiceFlowDirection;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150314.pcmm.qos.gates.apps.subs.Gates;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.Ccaps;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceClassName;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceFlowDirection;
+import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.subs.Gates;
 import org.pcmm.PCMMDef;
 import org.pcmm.PCMMPdpAgent;
 import org.pcmm.PCMMPdpDataProcess;

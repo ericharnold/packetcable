@@ -33,7 +33,7 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
 
         final ListenerRegistration<DataChangeListener> ccapNodeDataChangeListenerRegistration =
                 dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
-                        provider.ccapsIID, provider, DataBroker.DataChangeScope.SUBTREE );
+                        provider.ccapIID, provider, DataBroker.DataChangeScope.SUBTREE );
 
         final ListenerRegistration<DataChangeListener> serviceFlowsDataChangeListenerRegistration =
                 dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,

@@ -30,6 +30,7 @@ import org.opendaylight.controller.md.sal.binding.api.ReadOnlyTransaction;
 import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataBroker.DataChangeScope;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
+import org.opendaylight.controller.md.sal.common.api.data.AsyncReadWriteTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
@@ -132,7 +133,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private Map<String, Ccaps> ccapMap = new ConcurrentHashMap<String, Ccaps>();
 	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
-	private Map<String, Ccaps> gateCcapMap = new ConcurrentHashMap<String, Ccaps>();
+	private Map<String, String> gateCcapMap = new ConcurrentHashMap<String, String>();
 	private Map<Subnet, Ccaps> subscriberSubnetsMap = new ConcurrentHashMap<Subnet, Ccaps>();
 	private Map<ServiceClassName, List<Ccaps>> downstreamScnMap = new ConcurrentHashMap<ServiceClassName, List<Ccaps>>();
 	private Map<ServiceClassName, List<Ccaps>> upstreamScnMap = new ConcurrentHashMap<ServiceClassName, List<Ccaps>>();
@@ -158,23 +159,13 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	@Override
 	public void close() throws ExecutionException, InterruptedException {
 		executor.shutdown();
-		if (dataBroker != null) {
-			for (Iterator<InstanceIdentifier<?>> iter = cmtsInstances.iterator(); iter.hasNext();) {
-				WriteTransaction tx = dataBroker.newWriteOnlyTransaction();
-				tx.delete(LogicalDatastoreType.OPERATIONAL, iter.next());
-				Futures.addCallback(tx.submit(), new FutureCallback<Void>() {
-					@Override
-					public void onSuccess(final Void result) {
-						logger.debug("Delete commit result: " + result);
-					}
-
-					@Override
-					public void onFailure(final Throwable t) {
-						logger.error("Delete operation failed", t);
-					}
-				});
-			}
-		}
+        if (dataBroker != null) {
+        	// remove our config datastore instances
+            final AsyncReadWriteTransaction<InstanceIdentifier<?>, ?> tx = dataBroker.newReadWriteTransaction();
+            tx.delete(LogicalDatastoreType.CONFIGURATION, ccapIID);
+            tx.delete(LogicalDatastoreType.CONFIGURATION, qosIID);
+            tx.commit().get();
+        }
 	}
 
 	private String getIpAddressStr(IpAddress ipAddress) {
@@ -231,6 +222,32 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				List<Ccaps> ccapList = new ArrayList<Ccaps>();
 				ccapList.add(ccap);
 				downstreamScnMap.put(scn, ccapList);
+			}
+		}
+	}
+
+	private void removeCcapFromAllMaps(Ccaps ccap) {
+		// remove the ccap from all maps
+		// subscriberSubnets map
+		for (Map.Entry<Subnet, Ccaps> entry : subscriberSubnetsMap.entrySet()) {
+			if (entry.getValue() == ccap) {
+				subscriberSubnetsMap.remove(entry.getKey());
+			}
+		}
+		// ccap to upstream SCN map
+		for (Map.Entry<ServiceClassName, List<Ccaps>> entry : upstreamScnMap.entrySet()) {
+			List<Ccaps> ccapList = entry.getValue();
+			ccapList.remove(ccap);
+			if (ccapList.isEmpty()) {
+				upstreamScnMap.remove(entry.getKey());
+			}
+		}
+		// ccap to downstream SCN map
+		for (Map.Entry<ServiceClassName, List<Ccaps>> entry : downstreamScnMap.entrySet()) {
+			List<Ccaps> ccapList = entry.getValue();
+			ccapList.remove(ccap);
+			if (ccapList.isEmpty()) {
+				downstreamScnMap.remove(entry.getKey());
 			}
 		}
 	}
@@ -475,7 +492,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 								message = pcmmService.sendGateSet(thisCcap, gatePathStr, subId, gate, scnDir);
 								if (message.contains("200 OK")) {
 									gateMap.put(gatePathStr, gate);
-									gateCcapMap.put(gatePathStr, thisCcap);
+									gateCcapMap.put(gatePathStr, thisCcap.getCcapId());
 									logger.debug("onDataChanged(): created QoS gate {} for {}/{}/{} - {}",
 											gateId, ccapId, gatePathStr, gate, message);
 									logger.info("onDataChanged(): created QoS gate {} for {}/{} - {}",
@@ -534,8 +551,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 				if (gateMap.containsKey(gatePathStr)) {
 					thisGate = gateMap.remove(gatePathStr);
 					String gateId = thisGate.getGateId();
-					thisCcap = gateCcapMap.remove(gatePathStr);
-					ccapId = thisCcap.getCcapId();
+					ccapId = gateCcapMap.remove(gatePathStr);
+					thisCcap = ccapMap.get(ccapId);
 					pcmmService.sendGateDelete(thisCcap, gatePathStr);
 					logger.debug("onDataChanged(): removed QoS gate {} for {}/{}/{}: ", gateId, ccapId, gatePathStr, thisGate);
 					logger.info("onDataChanged(): removed QoS gate {} for {}/{}: ", gateId, ccapId, gatePathStr);
@@ -544,6 +561,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			for (String ccapIdStr: thisData.removePathList) {
 				if (ccapMap.containsKey(ccapIdStr)) {
 					thisCcap = ccapMap.remove(ccapIdStr);
+					removeCcapFromAllMaps(thisCcap);
 					pcmmService.removeCcap(thisCcap);
 					logger.debug("onDataChanged(): removed CCAP " + ccapIdStr + "/" + thisCcap);
 					logger.info("onDataChanged(): removed CCAP " + ccapIdStr);

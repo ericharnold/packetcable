@@ -79,6 +79,7 @@ public class Response implements Runnable {
 		this.gateBase = gateBase;
 	}
 
+	@SuppressWarnings("deprecation")
 	public void setResponse(InstanceIdentifier<Ccaps> ccapIID, Ccaps ccapBase, String message) {
 		CcapsBuilder ccapBuilder = new CcapsBuilder(ccapBase);
 		ccapBuilder.setResponse(message);
@@ -88,6 +89,7 @@ public class Response implements Runnable {
         writeTx.commit();
         logger.debug("Response.setResponse(ccap) complete {} {} {}", message, ccap, ccapIID);
 	}
+	@SuppressWarnings("deprecation")
 	public void setResponse(InstanceIdentifier<Gates> gateIID, Gates gateBase, String message) {
 		GatesBuilder gateBuilder = new GatesBuilder(gateBase);
 		gateBuilder.setResponse(message);

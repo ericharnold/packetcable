@@ -1,19 +1,10 @@
 package org.opendaylight.controller.packetcable.provider;
 
-import java.io.IOException;
-import java.lang.reflect.Array;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.InetAddress;
-import java.net.InterfaceAddress;
-import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,115 +12,48 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.opendaylight.controller.md.sal.binding.api.DataBroker;
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
-import org.opendaylight.controller.md.sal.binding.api.ReadOnlyTransaction;
-import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
-import org.opendaylight.controller.md.sal.common.api.data.AsyncDataBroker.DataChangeScope;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncReadWriteTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
-import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpPrefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Prefix;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.Ccaps;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.CcapsBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.CcapsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.Ccap;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.Qos;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceFlowDirection;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.TosByte;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.TpProtocol;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.attributes.AmId;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.attributes.AmIdBuilder;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.attributes.Connection;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.attributes.ConnectionBuilder;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.classifier.Classifier;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.classifier.ClassifierBuilder;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ext.classifier.ExtClassifier;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ext.classifier.ExtClassifierBuilder;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gate.spec.GateSpec;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gate.spec.GateSpecBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.Apps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.AppsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.Subs;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.SubsKey;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.subs.Gates;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.subs.GatesBuilder;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gates.apps.subs.GatesKey;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ipv6.classifier.Ipv6Classifier;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ipv6.classifier.Ipv6ClassifierBuilder;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.traffic.profile.TrafficProfile;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.traffic.profile.TrafficProfileBuilder;
-import org.opendaylight.yangtools.concepts.CompositeObjectRegistration;
-import org.opendaylight.yangtools.concepts.CompositeObjectRegistration.CompositeObjectRegistrationBuilder;
-import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.yang.binding.DataObject;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
-import org.opendaylight.yangtools.yang.binding.InstanceIdentifier.PathArgument;
-import org.opendaylight.yangtools.yang.binding.KeyedInstanceIdentifier;
-import org.opendaylight.yangtools.yang.binding.RpcService;
-import org.opendaylight.yangtools.yang.common.RpcResult;
-import org.opendaylight.yangtools.yang.common.RpcResultBuilder;
-import org.pcmm.PCMMDef;
-import org.pcmm.PCMMPdpAgent;
-import org.pcmm.PCMMPdpDataProcess;
-import org.pcmm.PCMMPdpMsgSender;
-import org.pcmm.gates.IClassifier;
-import org.pcmm.gates.IGateID;
-import org.pcmm.gates.IGateSpec;
-import org.pcmm.gates.IPCMMGate;
-import org.pcmm.gates.ISubscriberID;
-import org.pcmm.gates.ITrafficProfile;
-import org.pcmm.gates.impl.GateID;
-import org.pcmm.gates.impl.PCMMGateReq;
-import org.pcmm.gates.impl.SubscriberID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.umu.cops.prpdp.COPSPdpException;
-import org.umu.cops.stack.COPSError;
-import org.umu.cops.stack.COPSException;
-
-import com.google.common.base.Optional;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.CheckedFuture;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
-
-import org.pcmm.rcd.IPCMMPolicyServer;
-import org.pcmm.rcd.IPCMMPolicyServer.IPSCMTSClient;
-import org.pcmm.rcd.impl.PCMMPolicyServer;
 
 
 
-@SuppressWarnings("unused")
+//@SuppressWarnings("unused")
 public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private static final Logger logger = LoggerFactory.getLogger(PacketcableProvider.class);
 
-	// keys to the /restconf/config/packetcable:ccaps and /restconf/config/packetcable:qos config datastore
+	// keys to the /restconf/config/packetcable:ccap and /restconf/config/packetcable:qos config datastore
 	public static final InstanceIdentifier<Ccap> ccapIID = InstanceIdentifier.builder(Ccap.class).build();
 	public static final InstanceIdentifier<Qos> qosIID = InstanceIdentifier.builder(Qos.class).build();
 
 	private DataBroker dataBroker;
 	private final ExecutorService executor;
-
-	// The following holds the Future for the current make toast task.
-	// This is used to cancel the current toast.
-	private final AtomicReference<Future<?>> currentConnectionsTasks = new AtomicReference<>();
-	private ListenerRegistration<DataChangeListener> listenerRegistration;
-	private List<InstanceIdentifier<?>> cmtsInstances = Lists.newArrayList();
 
 	private Map<String, Ccaps> ccapMap = new ConcurrentHashMap<String, Ccaps>();
 	private Map<String, Gates> gateMap = new ConcurrentHashMap<String, Gates>();
@@ -145,10 +69,6 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		pcmmService = new PCMMService();
 	}
 
-//	public void setNotificationProvider(final NotificationProviderService salService) {
-//		this.notificationProvider = salService;
-//	}
-
 	public void setDataBroker(final DataBroker salDataBroker) {
 		this.dataBroker = salDataBroker;
 	}
@@ -156,6 +76,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 	/**
 	 * Implemented from the AutoCloseable interface.
 	 */
+	@SuppressWarnings("deprecation")
 	@Override
 	public void close() throws ExecutionException, InterruptedException {
 		executor.shutdown();
@@ -378,6 +299,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 		}
 
+		@SuppressWarnings("unchecked")
 		private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			logger.debug("onDataChanged().getCcap(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
@@ -388,6 +310,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		    }
 		}
 
+		@SuppressWarnings("unchecked")
 		private void getGates(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			logger.debug("onDataChanged().getGates(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {

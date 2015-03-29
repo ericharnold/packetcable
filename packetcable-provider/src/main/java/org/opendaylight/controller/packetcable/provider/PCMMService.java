@@ -172,7 +172,7 @@ public class PCMMService {
 		// and remember it
 		gateRequests.put(gatePathStr, gateReq);
 		// and send it to the CCAP
-		boolean ret = ccapClient.sendGateSet(gateReq);
+		ccapClient.sendGateSet(gateReq);
 		// and wait for the response to complete
 		try {
 			synchronized(gateReq) {
@@ -211,7 +211,7 @@ public class PCMMService {
 		// recover the original gate request
 		PCMMGateReq gateReq = gateRequests.remove(gatePathStr);
 		if (gateReq != null) {
-			Boolean ret = ccapClient.sendGateDelete(gateReq);
+			ccapClient.sendGateDelete(gateReq);
 			// and wait for the response to complete
 			try {
 				synchronized(gateReq) {
@@ -236,22 +236,5 @@ public class PCMMService {
 			return false;
 		}
 	}
-/*
-	public Boolean sendGateSynchronize() {
-		// TODO change me
-		boolean ret = true;
-		for (Iterator<IPSCMTSClient> iter = ccapClients.values().iterator(); iter.hasNext();)
-			ret &= ccapClients.get(0).gateSynchronize();
-		return ret;
-	}
-
-	public Boolean sendGateInfo() {
-		// TODO change me
-		boolean ret = true;
-		for (Iterator<IPSCMTSClient> iter = ccapClients.values().iterator(); iter.hasNext();)
-			ret &= ccapClients.get(0).gateInfo();
-		return ret;
-	}
-*/
 }
 

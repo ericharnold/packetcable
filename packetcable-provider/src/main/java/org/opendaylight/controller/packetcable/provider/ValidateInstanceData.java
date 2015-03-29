@@ -1,5 +1,12 @@
 /**
+ * Validate all instance data received from the config datastore via the onDataChange() notification.
  *
+ * N.B. that yang typedefs are not validated when a PUT operation places them into the config datastore.
+ * This means that they can arrive at onDataChange() with invalid values.
+ *
+ * In particular integer range values and string patterns (such as IP prefix/len) are not checked
+ * and accessing these values via any object.getValue() method call will cause an exception (as yang
+ * finally gets around to actually enforcing the typedef).
  */
 package org.opendaylight.controller.packetcable.provider;
 
@@ -101,6 +108,7 @@ public class ValidateInstanceData {
 		}
 		return valid;
 	}
+	@SuppressWarnings("unchecked")
 	private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
 		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
 			if (entry.getValue() instanceof Ccaps) {
@@ -109,6 +117,7 @@ public class ValidateInstanceData {
 	        }
 	    }
 	}
+	@SuppressWarnings("unchecked")
 	private void getGates(Map<InstanceIdentifier<?>, DataObject> thisData) {
 		for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
 			if (entry.getValue() instanceof Gates) {
@@ -121,9 +130,8 @@ public class ValidateInstanceData {
 	private String validateMethod(Class<?> thisClass, Object thisObj, String methodName) {
 		String error = null;
 		try {
-			Object result = null;
 			Method method = thisClass.getMethod(methodName);
-			result = method.invoke(thisObj);
+			method.invoke(thisObj);
 		} catch (IllegalArgumentException e) {
 			error = e.getMessage();
 			return error;

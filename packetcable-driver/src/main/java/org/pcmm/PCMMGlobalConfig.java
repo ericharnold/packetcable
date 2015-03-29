@@ -14,7 +14,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.pcmm.gates.IPCMMGate;
-import org.pcmm.gates.ITransactionID;
 
 public class PCMMGlobalConfig {
     // System

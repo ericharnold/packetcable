@@ -1,45 +1,28 @@
 /**
- *
+ * Build PCMM gate requests from API QoS Gate objects
  */
 package org.opendaylight.controller.packetcable.provider;
 
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpPrefix;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.PortNumber;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceClassName;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ServiceFlowDirection;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.TosByte;
-import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.TpProtocol;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.attributes.AmId;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.classifier.Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ext.classifier.ExtClassifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.gate.spec.GateSpec;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.ipv6.classifier.Ipv6Classifier;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.pcmm.qos.traffic.profile.TrafficProfile;
-import org.pcmm.PCMMPdpAgent;
-import org.pcmm.PCMMPdpDataProcess;
-import org.pcmm.PCMMPdpMsgSender;
 import org.pcmm.gates.IAMID;
 import org.pcmm.gates.IClassifier;
-import org.pcmm.gates.IClassifier.Protocol;
 import org.pcmm.gates.IExtendedClassifier;
 import org.pcmm.gates.IGateSpec;
 import org.pcmm.gates.IGateSpec.DSCPTOS;
 import org.pcmm.gates.IIPv6Classifier;
 import org.pcmm.gates.ISubscriberID;
 import org.pcmm.gates.IGateSpec.Direction;
-import org.pcmm.gates.ITrafficProfile;
-import org.pcmm.gates.impl.AMID;
-//import org.pcmm.gates.impl.BestEffortService;
-//import org.pcmm.gates.impl.BestEffortService.BEEnvelop;
 import org.pcmm.gates.impl.DOCSISServiceClassNameTrafficProfile;
-import org.pcmm.gates.impl.ExtendedClassifier;
 import org.pcmm.gates.impl.PCMMGateReq;
 import org.pcmm.gates.impl.SubscriberID;
 import org.slf4j.Logger;
@@ -360,75 +343,4 @@ public class PCMMGateReqBuilder {
 		// push the IPv6 classifier to the gate request
 		gateReq.setClassifier(ipv6Classifier);
 	}
-
-
-	/*
-	public ITrafficProfile process(TrafficProfileBestEffortAttributes bestEffort) {
-		BestEffortService trafficProfile = new BestEffortService(BestEffortService.DEFAULT_ENVELOP);
-		getBEAuthorizedEnvelop(bestEffort, trafficProfile);
-		getBEReservedEnvelop(bestEffort, trafficProfile);
-		getBECommittedEnvelop(bestEffort, trafficProfile);
-		return trafficProfile;
-	}
-
-	public ITrafficProfile process(TrafficProfileFlowspecAttributes flowSpec) {
-		throw new UnsupportedOperationException("Not impelemnted yet");
-	}
-
-	private void getBECommittedEnvelop(TrafficProfileBestEffortAttributes bestEffort, BestEffortService trafficProfile) {
-		BEEnvelop committedEnvelop = trafficProfile.getCommittedEnvelop();
-		BeCommittedEnvelope beCommittedEnvelope = bestEffort.getBeCommittedEnvelope();
-		if (beCommittedEnvelope.getTrafficPriority() != null)
-			committedEnvelop.setTrafficPriority(beCommittedEnvelope.getTrafficPriority().byteValue());
-		else
-			committedEnvelop.setTrafficPriority(BestEffortService.DEFAULT_TRAFFIC_PRIORITY);
-		if (beCommittedEnvelope.getMaximumTrafficBurst() != null)
-			committedEnvelop.setMaximumTrafficBurst(beCommittedEnvelope.getMaximumTrafficBurst().intValue());
-		else
-			committedEnvelop.setMaximumTrafficBurst(BestEffortService.DEFAULT_MAX_TRAFFIC_BURST);
-		if (beCommittedEnvelope.getRequestTransmissionPolicy() != null)
-			committedEnvelop.setRequestTransmissionPolicy(beCommittedEnvelope.getRequestTransmissionPolicy().intValue());
-		// else
-		// committedEnvelop.setRequestTransmissionPolicy(PCMMGlobalConfig.BETransmissionPolicy);
-		if (beCommittedEnvelope.getMaximumSustainedTrafficRate() != null)
-			committedEnvelop.setMaximumSustainedTrafficRate(beCommittedEnvelope.getMaximumSustainedTrafficRate().intValue());
-		// else
-		// committedEnvelop.setMaximumSustainedTrafficRate(PCMMGlobalConfig.DefaultLowBestEffortTrafficRate);
-	}
-
-	private void getBEReservedEnvelop(TrafficProfileBestEffortAttributes bestEffort, BestEffortService trafficProfile) {
-		BEEnvelop reservedEnvelop = trafficProfile.getReservedEnvelop();
-		BeReservedEnvelope beReservedEnvelope = bestEffort.getBeReservedEnvelope();
-		if (beReservedEnvelope.getTrafficPriority() != null)
-			reservedEnvelop.setTrafficPriority(beReservedEnvelope.getTrafficPriority().byteValue());
-		else
-			reservedEnvelop.setTrafficPriority(BestEffortService.DEFAULT_TRAFFIC_PRIORITY);
-		if (beReservedEnvelope.getMaximumTrafficBurst() != null)
-			reservedEnvelop.setMaximumTrafficBurst(beReservedEnvelope.getMaximumTrafficBurst().intValue());
-		else
-			reservedEnvelop.setMaximumTrafficBurst(BestEffortService.DEFAULT_MAX_TRAFFIC_BURST);
-		if (beReservedEnvelope.getRequestTransmissionPolicy() != null)
-			reservedEnvelop.setRequestTransmissionPolicy(beReservedEnvelope.getRequestTransmissionPolicy().intValue());
-		if (beReservedEnvelope.getMaximumSustainedTrafficRate() != null)
-			reservedEnvelop.setMaximumSustainedTrafficRate(beReservedEnvelope.getMaximumSustainedTrafficRate().intValue());
-	}
-
-	private void getBEAuthorizedEnvelop(TrafficProfileBestEffortAttributes bestEffort, BestEffortService trafficProfile) {
-		BEEnvelop authorizedEnvelop = trafficProfile.getAuthorizedEnvelop();
-		BeAuthorizedEnvelope beAuthorizedEnvelope = bestEffort.getBeAuthorizedEnvelope();
-		if (beAuthorizedEnvelope.getTrafficPriority() != null)
-			authorizedEnvelop.setTrafficPriority(beAuthorizedEnvelope.getTrafficPriority().byteValue());
-		else
-			authorizedEnvelop.setTrafficPriority(BestEffortService.DEFAULT_TRAFFIC_PRIORITY);
-		if (beAuthorizedEnvelope.getMaximumTrafficBurst() != null)
-			authorizedEnvelop.setMaximumTrafficBurst(beAuthorizedEnvelope.getMaximumTrafficBurst().intValue());
-		else
-			authorizedEnvelop.setMaximumTrafficBurst(BestEffortService.DEFAULT_MAX_TRAFFIC_BURST);
-		if (beAuthorizedEnvelope.getRequestTransmissionPolicy() != null)
-			authorizedEnvelop.setRequestTransmissionPolicy(beAuthorizedEnvelope.getRequestTransmissionPolicy().intValue());
-		if (beAuthorizedEnvelope.getMaximumSustainedTrafficRate() != null)
-			authorizedEnvelop.setMaximumSustainedTrafficRate(beAuthorizedEnvelope.getMaximumSustainedTrafficRate().intValue());
-	}
-*/
-
 }

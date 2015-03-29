@@ -24,7 +24,8 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
         // add custom validation form module attributes here.
     }
 
-    @Override
+    @SuppressWarnings("unused")
+	@Override
     public java.lang.AutoCloseable createInstance() {
         PacketcableProvider provider = new PacketcableProvider();
 
@@ -33,11 +34,11 @@ public class PacketcableProviderModule extends org.opendaylight.yang.gen.v1.urn.
 
         final ListenerRegistration<DataChangeListener> ccapNodeDataChangeListenerRegistration =
                 dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
-                        provider.ccapIID, provider, DataBroker.DataChangeScope.SUBTREE );
+                        PacketcableProvider.ccapIID, provider, DataBroker.DataChangeScope.SUBTREE );
 
         final ListenerRegistration<DataChangeListener> serviceFlowsDataChangeListenerRegistration =
                 dataBrokerService.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
-                        provider.qosIID, provider, DataBroker.DataChangeScope.SUBTREE );
+                        PacketcableProvider.qosIID, provider, DataBroker.DataChangeScope.SUBTREE );
 
 
         logger.info("PacketCableProvider Registered with DataBroker");

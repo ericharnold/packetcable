@@ -17,10 +17,8 @@ import java.net.UnknownHostException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.umu.cops.common.COPSDebug;
 import org.umu.cops.ospep.COPSPepException;
 import org.umu.cops.prpdp.COPSPdpAgent;
-import org.umu.cops.prpdp.COPSPdpConnection;
 import org.umu.cops.prpdp.COPSPdpException;
 import org.umu.cops.stack.COPSAcctTimer;
 import org.umu.cops.stack.COPSClientAcceptMsg;
@@ -69,8 +67,6 @@ public class PCMMPdpAgent extends COPSPdpAgent {
     private PCMMPdpDataProcess _process;
     private MMVersionInfo _mminfo;
     private COPSHandle _handle;
-    private short _transactionID;
-
     /**
      * Creates a PDP Agent
      *
@@ -184,7 +180,8 @@ public class PCMMPdpAgent extends COPSPdpAgent {
      * @throws COPSException
      * @throws IOException
      */
-    private void handleClientOpenMsg(Socket conn, COPSMsg msg)
+    @SuppressWarnings("unchecked")
+	private void handleClientOpenMsg(Socket conn, COPSMsg msg)
     throws COPSException, IOException {
         COPSClientOpenMsg cMsg = (COPSClientOpenMsg) msg;
         COPSPepId pepId = cMsg.getPepId();

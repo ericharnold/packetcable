@@ -218,9 +218,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	private class InstanceData {
 		// CCAP Identity
-		public Ccaps ccap;
-		public String ccapId;
-		public InstanceIdentifier<Ccaps> ccapIID;
+		public Map<InstanceIdentifier<Ccaps>, Ccaps> ccapIidMap = new HashMap<InstanceIdentifier<Ccaps>, Ccaps>();
 		// Gate Identity
 		public IpAddress subId;
 		public Map<String, String> gatePathMap = new HashMap<String, String>();
@@ -231,11 +229,8 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 		public InstanceData(Map<InstanceIdentifier<?>, DataObject> thisData) {
 			// only used to parse createdData or updatedData
-			getCcap(thisData);
-			if (ccap != null) {
-				ccapId = ccap.getCcapId();
-				gatePath = ccapId;
-			} else {
+			getCcaps(thisData);
+			if (ccapIidMap.isEmpty()) {
 				getGates(thisData);
 				if (! gateIidMap.isEmpty()){
 					gatePath = gatePathMap.get("appId") + "/" + gatePathMap.get("subId");
@@ -300,13 +295,14 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 
 		@SuppressWarnings("unchecked")
-		private void getCcap(Map<InstanceIdentifier<?>, DataObject> thisData) {
-			logger.debug("onDataChanged().getCcap(): " + thisData);
+		private void getCcaps(Map<InstanceIdentifier<?>, DataObject> thisData) {
+			logger.debug("onDataChanged().getCcaps(): " + thisData);
 			for (Map.Entry<InstanceIdentifier<?>, DataObject> entry : thisData.entrySet()) {
 				if (entry.getValue() instanceof Ccaps) {
-		            ccap = (Ccaps)entry.getValue();
-		            ccapIID = (InstanceIdentifier<Ccaps>) entry.getKey();
-		        }
+					Ccaps ccap = (Ccaps)entry.getValue();
+					InstanceIdentifier<Ccaps> ccapIID = (InstanceIdentifier<Ccaps>)entry.getKey();
+					ccapIidMap.put(ccapIID, ccap);
+				}
 		    }
 		}
 
@@ -370,32 +366,33 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 		// select the change action
 		String ccapId = null;
-		Ccaps lastCcap = null;
 		Ccaps thisCcap = null;
-		Gates lastGate = null;
 		Gates thisGate = null;
 		switch (changeAction) {
 		case created:
-			// get the CMTS parameters from the CmtsNode in the Map entry (if new CMTS)
-			thisCcap = thisData.ccap;
+			// get the CCAP parameters
 			String message = null;
-			if (thisCcap != null) {
-				// get the CMTS node identity from the Instance Data
-				ccapId = thisData.ccapId;
-				message = pcmmService.addCcap(thisCcap);
-				if (message.contains("200 OK")) {
-					ccapMap.put(ccapId, thisCcap);
-					updateCcapMaps(thisCcap);
-					logger.debug("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
-					logger.info("onDataChanged(): created CCAP: {} : {}", thisData.gatePath, message);
-				} else {
-					logger.error("onDataChanged(): create CCAP Failed: {} : {}", thisData.gatePath, message);
+			if (! thisData.ccapIidMap.isEmpty()) {
+				for (Map.Entry<InstanceIdentifier<Ccaps>, Ccaps> entry : thisData.ccapIidMap.entrySet()) {
+					InstanceIdentifier<Ccaps> thisCcapIID = entry.getKey();
+					thisCcap = entry.getValue();
+					// get the CCAP node identity from the Instance Data
+					ccapId = thisCcap.getCcapId();
+					message = pcmmService.addCcap(thisCcap);
+					if (message.contains("200 OK")) {
+						ccapMap.put(ccapId, thisCcap);
+						updateCcapMaps(thisCcap);
+						logger.debug("onDataChanged(): created CCAP: {}/{} : {}", thisData.gatePath, thisCcap, message);
+						logger.info("onDataChanged(): created CCAP: {} : {}", thisData.gatePath, message);
+					} else {
+						logger.error("onDataChanged(): create CCAP Failed: {} : {}", thisData.gatePath, message);
+					}
+					// set the response string in the config ccap object using a new thread
+					Response response = new Response(dataBroker, thisCcapIID, thisCcap, message);
+					executor.execute(response);
 				}
-				// set the response string in the config ccap object using a new thread
-				Response response = new Response(dataBroker, thisData.ccapIID, thisCcap, message);
-				executor.execute(response);
 			} else {
-				// get the PCMM gate parameters from the cmtsId/appId/subId/gateId path in the Maps entry (if new gate)
+				// get the PCMM gate parameters from the ccapId/appId/subId/gateId path in the Maps entry (if new gate)
 				for (Map.Entry<InstanceIdentifier<Gates>, Gates> entry : thisData.gateIidMap.entrySet()) {
 					message = null;
 					Gates gate = entry.getValue();
@@ -448,23 +445,17 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			break;
 		case updated:
-			thisCcap = thisData.ccap;
-			if (thisCcap != null) {
-				// get the CMTS node identity from the Instance Data
-				ccapId = thisData.ccapId;
-				lastCcap = ccapMap.get(ccapId);
-				logger.debug("onDataChanged(): updated CCAP " + ccapId + ": FROM: " + lastCcap + " TO: " + thisCcap);
-				ccapMap.put(ccapId, thisCcap);
-				// remove original cmtsNode
-				pcmmService.removeCcap(lastCcap);
-				// and add back the new one
-				pcmmService.addCcap(thisCcap);
+			if (! thisData.ccapIidMap.isEmpty()) {
+				for (Ccaps ccap : thisData.ccapIidMap.values()) {
+					// get the CCAP node identity from the Instance Data
+					ccapId = ccap.getCcapId();
+					logger.error("onDataChanged(): CCAP update not permitted {}/{}", ccapId, ccap);
+				}
 			} else {
 				for (Gates gate : thisData.gateIidMap.values()) {
 					String gateId = gate.getGateId();
 					String gatePathStr = thisData.gatePath + "/" + gateId ;
-					lastGate = gateMap.get(gatePathStr);
-					logger.debug("onDataChanged(): updated QoS gate: FROM: " + gatePathStr + "/" + lastGate + " TO: " + gate);
+					logger.error("onDataChanged(): QoS Gate update not permitted: {}/{}", gatePathStr, gate);
 				}
 			}
 			break;

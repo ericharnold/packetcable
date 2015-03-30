@@ -47,8 +47,8 @@ module packetcable
 		list ccaps {
 			description "
 				CCAP devices are known by their network name which is any string.
-				Each CCAP device has a network address, a list of subscriber IP subnets,
-				a list of available Service Class Names, and a COPS connection state.
+				Each CCAP device has a network address:port, a list of subscriber IP subnets,
+				and a list of available Service Class Names.
 				";
 		    key "ccapId";
 			leaf ccapId {
@@ -61,7 +61,7 @@ module packetcable
   
 	grouping ccap-attributes {
 		description "
-			Each CCAP device has a COPS connection address, port, and state,
+			Each CCAP device has a COPS connection address:port,
 			a list of subscriber IP subnets, and
 			a list of available Service Class Names.
 			";

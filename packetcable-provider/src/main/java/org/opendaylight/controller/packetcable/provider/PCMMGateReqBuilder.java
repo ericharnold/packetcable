@@ -166,6 +166,8 @@ public class PCMMGateReqBuilder {
 		// Protocol -- zero is match any
 		if (qosExtClassifier.getProtocol() != null){
 			extClassifier.setProtocol(qosExtClassifier.getProtocol().getValue().shortValue());
+		} else {
+			extClassifier.setProtocol((short)0);
 		}
 		// Source IP address & mask
 		if (qosExtClassifier.getSrcIp() != null) {

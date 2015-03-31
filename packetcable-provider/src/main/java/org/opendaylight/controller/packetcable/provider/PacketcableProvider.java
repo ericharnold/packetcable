@@ -333,6 +333,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		// and validate all instance data
 		ValidateInstanceData validator = null;
 		InstanceData thisData = null;
+		InstanceData oldData = null;
 		ChangeAction changeAction = null;
 		if (! createdData.isEmpty()) {
 			validator = new ValidateInstanceData(dataBroker, createdData);
@@ -357,6 +358,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			changeAction = ChangeAction.updated;
 			thisData = new InstanceData(updatedData);
 			logger.debug("onDataChanged().updatedData: " + updatedData);
+			oldData = new InstanceData(originalData);
 			logger.debug("onDataChanged().originalData: " + originalData);
 		} else {
 			// we should not be here -- complain bitterly and return
@@ -445,16 +447,32 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 			}
 			break;
 		case updated:
-			if (! thisData.ccapIidMap.isEmpty()) {
-				for (Ccaps ccap : thisData.ccapIidMap.values()) {
-					// get the CCAP node identity from the Instance Data
+			// update operation not allowed -- restore the original config object and complain
+			if (! oldData.ccapIidMap.isEmpty()) {
+				for (Map.Entry<InstanceIdentifier<Ccaps>, Ccaps> entry : oldData.ccapIidMap.entrySet()) {
+					InstanceIdentifier<Ccaps> ccapIID = entry.getKey();
+					Ccaps ccap = entry.getValue();
 					ccapId = ccap.getCcapId();
+					message = String.format("405 Method Not Allowed - %s: CCAP update not permitted (use delete); ", ccapId);
+					// push new error message onto existing response
+					message += ccap.getResponse();
+					// set the response message in the config object using a new thread -- also restores the original data
+					Response response = new Response(dataBroker, ccapIID, ccap, message);
+					executor.execute(response);
 					logger.error("onDataChanged(): CCAP update not permitted {}/{}", ccapId, ccap);
 				}
 			} else {
-				for (Gates gate : thisData.gateIidMap.values()) {
+				for (Map.Entry<InstanceIdentifier<Gates>, Gates> entry : oldData.gateIidMap.entrySet()) {
+					InstanceIdentifier<Gates> gateIID = entry.getKey();
+					Gates gate = entry.getValue();
 					String gateId = gate.getGateId();
-					String gatePathStr = thisData.gatePath + "/" + gateId ;
+					String gatePathStr = oldData.gatePath + "/" + gateId ;
+					message = String.format("405 Method Not Allowed - %s: QoS Gate update not permitted (use delete); ", gatePathStr);
+					// push new error message onto existing response
+					message += gate.getResponse();
+					// set the response message in the config object using a new thread -- also restores the original data
+					Response response = new Response(dataBroker, gateIID, gate, message);
+					executor.execute(response);
 					logger.error("onDataChanged(): QoS Gate update not permitted: {}/{}", gatePathStr, gate);
 				}
 			}

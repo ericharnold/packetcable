@@ -324,10 +324,22 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 
 	@Override
 	public void onDataChanged(final AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
-		Map<InstanceIdentifier<?>, DataObject> createdData = change.getCreatedData();
-		Map<InstanceIdentifier<?>, DataObject> updatedData = change.getUpdatedData();
-		Map<InstanceIdentifier<?>, DataObject> originalData = change.getOriginalData();
-		Set<InstanceIdentifier<?>> removedData = change.getRemovedPaths();
+		Map<InstanceIdentifier<?>, DataObject> createdData = null;
+		Map<InstanceIdentifier<?>, DataObject> updatedData = null;
+		Map<InstanceIdentifier<?>, DataObject> originalData = null;
+		Set<InstanceIdentifier<?>> removedData = null;
+		try {
+			// watch for invalid yang typdefs in the change object -- these are not validated until now
+			createdData = change.getCreatedData();
+			updatedData = change.getUpdatedData();
+			originalData = change.getOriginalData();
+			removedData = change.getRemovedPaths();
+		} catch (Exception e) {
+			// most likely this is a subId that is not a valid IP address
+			logger.error("onDataChanged(): Malformed DataObject change -- most likely a subId that is not a valid IP address: {}",
+					e.getMessage());
+			return;
+		}
 
 		// Determine what change action took place by looking at the change object's InstanceIdentifier sets
 		// and validate all instance data

@@ -54,15 +54,9 @@ public class PCMMGateReqBuilder {
         gateReq.setAMID(amId);
 	}
 
-	public void build(String qosSubId){
+	public void build(InetAddress qosSubId){
 		ISubscriberID subId = new SubscriberID();
-		InetAddress inetAddr = null;
-		try {
-			inetAddr = InetAddress.getByName(qosSubId);
-		} catch (UnknownHostException e) {
-			logger.error("sendGateSet(): Invalid SubId: " + e);
-		}
-		subId.setSourceIPAddress(inetAddr);
+		subId.setSourceIPAddress(qosSubId);
 		gateReq.setSubscriberID(subId);
 	}
 

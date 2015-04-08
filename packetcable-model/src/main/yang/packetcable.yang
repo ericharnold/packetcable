@@ -130,8 +130,8 @@ module packetcable
             list subs {
                 key "subId";
 			    leaf subId {
-		            type inet:ip-address;
-			    	description "Subscriber Identity";
+		            type string;
+				description "Subscriber Identity -- must be a CM or CPE IP address";
 			    }
 	            list gates {
 	                key "gateId";

@@ -18,11 +18,8 @@ import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncReadWriteTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpPrefix;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
-import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv6Prefix;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.Ccaps;
 import org.opendaylight.yang.gen.v1.urn.packetcable.rev150327.ccap.CcapsKey;
@@ -89,17 +86,15 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
         }
 	}
 
-	private String getIpAddressStr(IpAddress ipAddress) {
-		String ipAddressStr = null;
-		Ipv4Address ipv4 = ipAddress.getIpv4Address();
-
-		if (ipv4 != null) {
-			ipAddressStr = ipv4.getValue();
-		} else {
-			Ipv6Address ipv6 = ipAddress.getIpv6Address();
-			ipAddressStr = ipv6.getValue();
+	public InetAddress getInetAddress(String subId){
+		InetAddress inetAddr = null;
+		try {
+			inetAddr = InetAddress.getByName(subId);
+		} catch (UnknownHostException e) {
+			logger.error("getInetAddress: {} FAILED: {}", subId, e.getMessage());
+			return null;
 		}
-		return ipAddressStr;
+		return inetAddr;
 	}
 
 	private String getIpPrefixStr(IpPrefix ipPrefix) {
@@ -173,14 +168,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		}
 	}
 
-	private Ccaps findCcapForSubscriberId(IpAddress ipAddress) {
-		String ipAddressStr = getIpAddressStr(ipAddress);
-		InetAddress inetAddr = null;
-		try {
-			inetAddr = InetAddress.getByName(ipAddressStr);
-		} catch (UnknownHostException e) {
-			logger.error("getSubscriberSubnetsLPM: {} FAILED: {}", ipAddressStr, e.getMessage());
-		}
+	private Ccaps findCcapForSubscriberId(InetAddress inetAddr) {
 		Ccaps matchedCcap = null;
 		int longestPrefixLen = -1;
 		for (Map.Entry<Subnet, Ccaps> entry : subscriberSubnetsMap.entrySet()) {
@@ -220,7 +208,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 		// CCAP Identity
 		public Map<InstanceIdentifier<Ccaps>, Ccaps> ccapIidMap = new HashMap<InstanceIdentifier<Ccaps>, Ccaps>();
 		// Gate Identity
-		public IpAddress subId;
+		public String subId;
 		public Map<String, String> gatePathMap = new HashMap<String, String>();
 		public String gatePath;
 		public Map<InstanceIdentifier<Gates>, Gates> gateIidMap = new HashMap<InstanceIdentifier<Gates>, Gates>();
@@ -276,8 +264,7 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 						SubsKey subKey = InstanceIdentifier.keyOf(subsInstance);
 						if (subKey != null) {
 							subId = subKey.getSubId();
-							String subIdStr = getIpAddressStr(subId);
-							gatePathMap.put("subId", subIdStr);
+							gatePathMap.put("subId", subId);
 						}
 					}
 					InstanceIdentifier<Gates> gatesInstance = thisInstance.firstIdentifierOf(Gates.class);
@@ -413,43 +400,53 @@ public class PacketcableProvider implements DataChangeListener, AutoCloseable {
 					InstanceIdentifier<Gates> gateIID = entry.getKey();
 					String gateId = gate.getGateId();
 					String gatePathStr = thisData.gatePath + "/" + gateId ;
-					IpAddress subId = thisData.subId;
-					thisCcap = findCcapForSubscriberId(subId);
-					if (thisCcap != null) {
-						ccapId = thisCcap.getCcapId();
-						// verify SCN exists on CCAP and force gateSpec.Direction to align with SCN direction
-						ServiceFlowDirection scnDir = null;
-						ServiceClassName scn = gate.getTrafficProfile().getServiceClassName();
-						if (scn != null) {
-							scnDir = findScnOnCcap(scn, thisCcap);
-							if (scnDir != null) {
-								message = pcmmService.sendGateSet(thisCcap, gatePathStr, subId, gate, scnDir);
-								if (message.contains("200 OK")) {
-									gateMap.put(gatePathStr, gate);
-									gateCcapMap.put(gatePathStr, thisCcap.getCcapId());
-									logger.debug("onDataChanged(): created QoS gate {} for {}/{}/{} - {}",
-											gateId, ccapId, gatePathStr, gate, message);
-									logger.info("onDataChanged(): created QoS gate {} for {}/{} - {}",
-											gateId, ccapId, gatePathStr, message);
+					InetAddress subId = getInetAddress(thisData.subId);
+					if (subId != null) {
+						thisCcap = findCcapForSubscriberId(subId);
+						if (thisCcap != null) {
+							ccapId = thisCcap.getCcapId();
+							// verify SCN exists on CCAP and force gateSpec.Direction to align with SCN direction
+							ServiceFlowDirection scnDir = null;
+							ServiceClassName scn = gate.getTrafficProfile().getServiceClassName();
+							if (scn != null) {
+								scnDir = findScnOnCcap(scn, thisCcap);
+								if (scnDir != null) {
+									message = pcmmService.sendGateSet(thisCcap, gatePathStr, subId, gate, scnDir);
+									if (message.contains("200 OK")) {
+										gateMap.put(gatePathStr, gate);
+										gateCcapMap.put(gatePathStr, thisCcap.getCcapId());
+										logger.debug("onDataChanged(): created QoS gate {} for {}/{}/{} - {}",
+												gateId, ccapId, gatePathStr, gate, message);
+										logger.info("onDataChanged(): created QoS gate {} for {}/{} - {}",
+												gateId, ccapId, gatePathStr, message);
+									} else {
+										logger.debug("onDataChanged(): Unable to create QoS gate {} for {}/{}/{} - {}",
+												gateId, ccapId, gatePathStr, gate, message);
+										logger.error("onDataChanged(): Unable to create QoS gate {} for {}/{} - {}",
+												gateId, ccapId, gatePathStr, message);
+									}
 								} else {
-									logger.debug("onDataChanged(): Unable to create QoS gate {} for {}/{}/{} - {}",
-											gateId, ccapId, gatePathStr, gate, message);
-									logger.error("onDataChanged(): Unable to create QoS gate {} for {}/{} - {}",
-											gateId, ccapId, gatePathStr, message);
+									logger.error("PCMMService: sendGateSet(): SCN {} not found on CCAP {} for {}/{}",
+										scn.getValue(), thisCcap, gatePathStr, gate);
+									message = String.format("404 Not Found - SCN %s not found on CCAP %s for %s",										scn.getValue(), thisCcap.getCcapId(), gatePathStr);
 								}
-							} else {
-								logger.error("PCMMService: sendGateSet(): SCN {} not found on CCAP {} for {}/{}",
-				                		scn.getValue(), thisCcap, gatePathStr, gate);
-								message = String.format("404 Not Found - SCN %s not found on CCAP %s for %s",										scn.getValue(), thisCcap.getCcapId(), gatePathStr);
 							}
+						} else {
+							String subIdStr = thisData.subId;
+							message = String.format("404 Not Found - no CCAP found for subscriber %s in %s",
+									subIdStr, gatePathStr);
+							logger.debug("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}/{}",
+									gateId, subIdStr, gatePathStr, gate);
+							logger.error("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}",
+									gateId, subIdStr, gatePathStr);
 						}
 					} else {
-						String subIdStr = thisData.gatePathMap.get("subId");
-						message = String.format("404 Not Found - no CCAP found for subscriber %s in %s",
+						String subIdStr = thisData.subId;
+						message = String.format("400 Bad Request - subId must be a valid IP address for subscriber %s in %s",
 								subIdStr, gatePathStr);
-						logger.debug("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}/{}",
+						logger.debug("onDataChanged(): create QoS gate {} FAILED: subId must be a valid IP address for subscriber {}: @ {}/{}",
 								gateId, subIdStr, gatePathStr, gate);
-						logger.error("onDataChanged(): create QoS gate {} FAILED: no CCAP found for subscriber {}: @ {}",
+						logger.error("onDataChanged(): create QoS gate {} FAILED: subId must be a valid IP address for subscriber {}: @ {}",
 								gateId, subIdStr, gatePathStr);
 					}
 					// set the response message in the config gate object using a new thread

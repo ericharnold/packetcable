@@ -1,6 +1,7 @@
 package org.opendaylight.controller.packetcable.provider;
 
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.Map;
 
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.IpAddress;
@@ -142,13 +143,13 @@ public class PCMMService {
 		}
 	}
 
-	public String sendGateSet(Ccaps ccap, String gatePathStr, IpAddress qosSubId, Gates qosGate, ServiceFlowDirection scnDir) {
+	public String sendGateSet(Ccaps ccap, String gatePathStr, InetAddress subId, Gates qosGate, ServiceFlowDirection scnDir) {
 		String responseStr = null;
 		CcapClient ccapClient = ccapClients.get(ccap);
 		// assemble the gate request for this subId
 		PCMMGateReqBuilder gateBuilder = new PCMMGateReqBuilder();
 		gateBuilder.build(ccap.getAmId());
-		gateBuilder.build(getIpAddressStr(qosSubId));
+		gateBuilder.build(subId);
 		// force gateSpec.Direction to align with SCN direction
 		ServiceClassName scn = qosGate.getTrafficProfile().getServiceClassName();
 		if (scn != null) {
